@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   channelKinds, makeId, makeTemplate, templates, validateConfig,
-  type ChannelKind, type Config, type Fixture, type Group, type Loadout, type Profile, type ProfileChannel,
+  type ChannelKind, type Config, type Fixture, type Group, type Loadout, type Profile, type ProfileChannel, type RuntimeState,
 } from '../model'
+import { Moods, type SimulationCommand } from './Moods'
 
-type RuntimeState = { blackout: boolean; outputEnabled: boolean; engineStatus: string }
 type Page = 'fixtures' | 'moods' | 'show'
 
 class ApiError extends Error {
@@ -52,6 +52,8 @@ export function App() {
   const [editorEpoch, setEditorEpoch] = useState(0)
   const [saveState, setSaveState] = useState<'saved' | 'pending' | 'saving' | 'error'>('saved')
   const [editVersion, setEditVersion] = useState(0)
+  const [commandBusy, setCommandBusy] = useState(false)
+  const commandVersion = useRef(0)
   const configRef = useRef<Config | null>(null)
   const versionRef = useRef(0)
   const savedVersionRef = useRef(0)
@@ -179,6 +181,45 @@ export function App() {
     }
   }
 
+  const loaded = config !== null
+  useEffect(() => {
+    if (!loaded) return
+    let cancelled = false
+    let timer: number
+    const poll = async () => {
+      const version = commandVersion.current
+      try {
+        const state = await request<RuntimeState>('/api/state')
+        if (!cancelled) {
+          if (version === commandVersion.current) setRuntime(state)
+          setBackendConnected(true)
+        }
+      } catch {
+        if (!cancelled) { setBackendConnected(false); setRuntime(null) }
+      }
+      if (!cancelled) timer = window.setTimeout(() => { void poll() }, page === 'moods' ? 150 : 1000)
+    }
+    void poll()
+    return () => { cancelled = true; window.clearTimeout(timer) }
+  }, [loaded, page])
+
+  const simulation = async (command: SimulationCommand) => {
+    if (commandBusy) return
+    commandVersion.current++
+    setCommandBusy(true)
+    try {
+      const state = await request<RuntimeState>('/api/simulation', { method: 'POST', body: JSON.stringify(command) })
+      setRuntime(state)
+      setBackendConnected(true)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 0) { setBackendConnected(false); setRuntime(null) }
+      setNotice(error instanceof Error ? error.message : 'Simulation command failed.')
+    } finally {
+      commandVersion.current++
+      setCommandBusy(false)
+    }
+  }
+
   if (!config) {
     return (
       <main className="connect-screen">
@@ -208,8 +249,8 @@ export function App() {
 
       <div className="safety-banner" role="status">
         <span className="safety-icon">!</span>
-        <span><strong>Setup only - lighting output not implemented.</strong> This app will not send DMX.</span>
-        <span className={runtime?.blackout ? 'blackout-pill' : 'blackout-pill unconfirmed'}><i /> {runtime ? (runtime.blackout ? 'BLACKOUT ACTIVE' : 'BLACKOUT NOT ACTIVE') : 'BLACKOUT UNKNOWN'}</span>
+        <span><strong>Simulation only - Art-Net output disabled.</strong> Generated DMX stays in software.</span>
+        <span className={runtime?.blackout ? 'blackout-pill' : 'blackout-pill unconfirmed'}><i /> {runtime ? (runtime.blackout ? 'SIM BLACKOUT' : 'SIM RUNNING') : 'SIM UNKNOWN'}</span>
       </div>
 
       <nav className="main-nav" aria-label="Main navigation">
@@ -217,7 +258,7 @@ export function App() {
           <button key={item} className={page === item ? 'nav-item active' : 'nav-item'} onClick={() => setPage(item)}>
             <span className={`nav-mark ${item}`} aria-hidden="true" />
             {item === 'fixtures' ? 'Fixtures' : item === 'moods' ? 'Moods' : 'Show'}
-            {item !== 'fixtures' && <span className="soon-tag">NOT READY</span>}
+            {item === 'show' && <span className="soon-tag">NOT READY</span>}
           </button>
         ))}
         <div className="nav-spacer" />
@@ -226,14 +267,14 @@ export function App() {
 
       <main className="content">
         <div hidden={page !== 'fixtures'}><Fixtures key={editorEpoch} config={config} onUpdate={updateConfig} onNotice={setNotice} /></div>
-        {page === 'moods' && <NotReady title="Mood editor" body="Mood behavior and simulation are planned, but are not part of this first setup slice." />}
+        <div hidden={page !== 'moods'}><Moods key={editorEpoch} config={config} runtime={runtime} ready={saveState === 'saved' && backendConnected && runtime !== null} busy={commandBusy} onUpdate={updateConfig} onCommand={simulation} onNotice={setNotice} /></div>
         {page === 'show' && <NotReady title="Show controls" body="There are no performance controls yet. This page cannot activate fixtures or send lighting output." />}
         <Backup saveState={saveState} onImported={applyImportedConfig} onNotice={setNotice} onConnection={setBackendConnected} />
       </main>
 
       <footer className="footer">
         <span>StageGlow local setup</span>
-        <span>{runtime?.engineStatus === 'not-implemented' ? 'Lighting engine not implemented' : 'Output status unavailable'} | Output disabled</span>
+        <span>{runtime?.engineStatus === 'simulation' ? 'Mood simulation' : 'Simulation status unavailable'} | Art-Net disabled</span>
       </footer>
       {(saveError || notice) && (
         <div className={saveError ? 'toast error' : 'toast'} role="alert">
@@ -306,6 +347,10 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
     setGroupDrafts({ ...groupDrafts, [group.id]: name })
   }
   const deleteGroup = (group: Group) => {
+    if (config.moods.some((mood) => mood.groups.some((settings) => settings.groupId === group.id))) {
+      onNotice(`"${group.name}" is used by moods. Remove it from those moods before deleting the group.`)
+      return
+    }
     if (config.loadouts.some((loadout) => loadout.fixtures.some((fixture) => fixture.groupId === group.id))) {
       onNotice(`"${group.name}" is assigned to fixtures. Reassign them before deleting this group.`)
       return
@@ -456,7 +501,7 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
 
     <div className="two-column">
       <section className="panel">
-        <div className="panel-heading compact"><div><div className="section-kicker">02 / REUSABLE IDENTITIES</div><h2>Fixture groups</h2><p>Stable group names for future mood controls.</p></div></div>
+        <div className="panel-heading compact"><div><div className="section-kicker">02 / REUSABLE IDENTITIES</div><h2>Fixture groups</h2><p>Reusable groups targeted by your moods.</p></div></div>
         <div className="group-list">
           {config.groups.map((group) => <div className="group-row" key={group.id}>
             <span className="group-mark" /><input aria-label={`Group name ${group.name}`} value={groupDrafts[group.id] ?? group.name} onChange={(event) => setGroupDrafts({ ...groupDrafts, [group.id]: event.target.value })} />

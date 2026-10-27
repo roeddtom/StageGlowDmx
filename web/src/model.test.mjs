@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { emptyConfig, makeTemplate, validateConfig } from './model.ts'
+import { emptyConfig, makeTemplate, makeMood, tapBPM, validateConfig } from './model.ts'
 
 function patchedRig() {
   const config = emptyConfig()
@@ -14,6 +14,60 @@ function patchedRig() {
 describe('configuration validation', () => {
   it('accepts a valid profile and fixture patch', () => {
     assert.deepEqual(validateConfig(patchedRig()), [])
+  })
+
+  describe('moods and tempo', () => {
+    it('builds a starter with steady front, evolving back and UV off', () => {
+      const config = patchedRig()
+      config.groups.push({ id: 'back', name: 'Back' })
+      const mood = makeMood(config.groups, true)
+      config.moods = [mood]
+      assert.deepEqual(validateConfig(config), [])
+      assert.equal(mood.groups[0].colorMode, 'static')
+      assert.equal(mood.groups[0].intensityMin, mood.groups[0].intensityMax)
+      assert.equal(mood.groups[1].colorMode, 'palette')
+      assert.ok(mood.groups.every((group) => group.uv === 0))
+    })
+
+    it('rejects invalid palettes, ranges, modes, timing and references', () => {
+      for (const edit of [
+        (mood) => { mood.groups[0].palette = [] },
+        (mood) => { mood.groups[0].palette = ['red'] },
+        (mood) => { mood.groups[0].intensityMin = 0.9 },
+        (mood) => { mood.groups[0].colorMode = 'strobe' },
+        (mood) => { mood.groups[0].groupId = 'deleted' },
+        (mood) => { mood.groups[0].uv = 1.1 },
+        (mood) => { mood.groups.push(structuredClone(mood.groups[0])) },
+        (mood) => { mood.smoothness = 0 },
+        (mood) => { mood.beatsPerChange = NaN },
+        (mood) => { mood.crossfadeSeconds = 31 },
+      ]) {
+        const config = patchedRig()
+        config.moods = [makeMood(config.groups)]
+        edit(config.moods[0])
+        assert.ok(validateConfig(config).length > 0)
+      }
+    })
+
+    it('accepts old schema-1 backups without moods and rejects explicit null', () => {
+      const config = patchedRig()
+      delete config.moods
+      assert.deepEqual(validateConfig(config), [])
+      config.moods = null
+      assert.match(validateConfig(config).join(' '), /Moods must be an array/)
+    })
+
+    it('calculates tapped tempo, rejects bounce, and resets after a long pause', () => {
+      let result = tapBPM([], 1000)
+      assert.equal(result.bpm, undefined)
+      result = tapBPM(result.taps, 1500)
+      assert.equal(result.bpm, 120)
+      assert.deepEqual(tapBPM(result.taps, 1550).taps, result.taps)
+      result = tapBPM(result.taps, 2000)
+      assert.equal(result.bpm, 120)
+      result = tapBPM(result.taps, 6000)
+      assert.deepEqual(result, { taps: [6000] })
+    })
   })
 
   it('accepts finite fractional mix and tempo settings in the backend ranges', () => {

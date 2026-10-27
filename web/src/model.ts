@@ -20,6 +20,35 @@ export type Profile = {
 export type Group = { id: string; name: string }
 export type Fixture = { id: string; name: string; profileId: string; startAddress: number; groupId: string }
 export type Loadout = { id: string; name: string; fixtures: Fixture[] }
+export type MoodGroup = {
+  groupId: string
+  colorMode: 'static' | 'palette'
+  palette: string[]
+  intensityMin: number
+  intensityMax: number
+  uv: number
+}
+export type Mood = {
+  id: string
+  name: string
+  beatsPerChange: number
+  smoothness: number
+  crossfadeSeconds: number
+  groups: MoodGroup[]
+}
+export type RuntimeState = {
+  blackout: boolean
+  outputEnabled: boolean
+  engineStatus: string
+  activeMoodId: string
+  bpm: number
+  master: number
+  dmx: number[]
+  fixtures: {
+    id: string; name: string; groupId: string; startAddress: number
+    color: string; intensity: number; uv: number; unsupportedUV: boolean; channels: number[]
+  }[]
+}
 export type Config = {
   schemaVersion: 1
   profiles: Profile[]
@@ -28,6 +57,7 @@ export type Config = {
   activeLoadoutId: string
   artNet: { destinationIp: string; portAddress: number }
   bpm: number
+  moods: Mood[]
 }
 
 export const emptyConfig = (): Config => ({
@@ -38,7 +68,32 @@ export const emptyConfig = (): Config => ({
   activeLoadoutId: '',
   artNet: { destinationIp: '', portAddress: 0 },
   bpm: 120,
+  moods: [],
 })
+
+export function makeMoodGroup(group: Group, evolving = false): MoodGroup {
+  return {
+    groupId: group.id, colorMode: evolving ? 'palette' : 'static',
+    palette: evolving ? ['#1644ff', '#a020f0', '#1634a0'] : ['#ffbb66'],
+    intensityMin: evolving ? 0.3 : 0.6, intensityMax: 0.6, uv: 0,
+  }
+}
+
+export function makeMood(groups: Group[], starter = false): Mood {
+  return {
+    id: makeId(), name: starter ? 'Warm stage' : 'New mood',
+    beatsPerChange: 8, smoothness: 1, crossfadeSeconds: 3,
+    groups: groups.map((group) => makeMoodGroup(group, starter && !/front/i.test(group.name))),
+  }
+}
+
+export function tapBPM(taps: number[], now: number): { taps: number[]; bpm?: number } {
+  const last = taps.at(-1)
+  if (last === undefined || now - last > 3000 || now <= last) return { taps: [now] }
+  if (now - last < 200) return { taps }
+  const next = [...taps, now].slice(-5)
+  return { taps: next, bpm: Math.round(60000 * (next.length - 1) / (now - next[0])) }
+}
 
 export const templates: { name: string; kinds: ChannelKind[] }[] = [
   { name: 'RGB', kinds: ['red', 'green', 'blue'] },
@@ -99,7 +154,7 @@ export function validateConfig(input: unknown): string[] {
     for (const key of Object.keys(value)) if (![...required, ...optional].includes(key)) errors.push(`${label} contains unsupported field "${key}".`)
     return true
   }
-  checkShape(input, 'Configuration', ['schemaVersion', 'profiles', 'groups', 'loadouts', 'activeLoadoutId', 'artNet', 'bpm'])
+  checkShape(input, 'Configuration', ['schemaVersion', 'profiles', 'groups', 'loadouts', 'activeLoadoutId', 'artNet', 'bpm'], ['moods'])
   const config = input as Partial<Config>
   if (config.schemaVersion !== 1) errors.push('Only configuration schema version 1 is supported.')
   if (!Array.isArray(config.profiles) || !Array.isArray(config.groups) || !Array.isArray(config.loadouts)) {
@@ -218,5 +273,34 @@ export function validateConfig(input: unknown): string[] {
   }
   const loadoutIds = new Set(loadouts.map((loadout) => loadout.id))
   if (config.activeLoadoutId && !loadoutIds.has(config.activeLoadoutId)) errors.push('Active loadout must reference an existing loadout.')
+  if ('moods' in input && !Array.isArray(config.moods)) errors.push('Moods must be an array.')
+  if (Array.isArray(config.moods)) {
+    uniqueIds(config.moods.filter(isRecord) as Mood[], 'Mood')
+    for (const rawMood of config.moods) {
+      if (!checkShape(rawMood, 'Mood', ['id', 'name', 'beatsPerChange', 'smoothness', 'crossfadeSeconds', 'groups'])) continue
+      const mood = rawMood as Mood
+      if (!isText(mood.name)) errors.push('Every mood needs a name.')
+      if (!isFiniteIn(mood.beatsPerChange, 0.25, 128)) errors.push('Beats per change must be 0.25-128.')
+      if (!isFiniteIn(mood.smoothness, 0.05, 1)) errors.push('Smoothness must be 0.05-1.')
+      if (!isFiniteIn(mood.crossfadeSeconds, 0, 30)) errors.push('Crossfade must be 0-30 seconds.')
+      if (!Array.isArray(mood.groups)) { errors.push('Mood groups must be an array.'); continue }
+      const assigned = new Set<string>()
+      for (const rawGroup of mood.groups) {
+        if (!checkShape(rawGroup, 'Mood group', ['groupId', 'colorMode', 'palette', 'intensityMin', 'intensityMax', 'uv'])) continue
+        const group = rawGroup as MoodGroup
+        if (!groupIds.has(group.groupId) || assigned.has(group.groupId)) errors.push('Mood must reference each existing group at most once.')
+        assigned.add(group.groupId)
+        if (!['static', 'palette'].includes(group.colorMode)) errors.push('Mood colour mode must be static or palette.')
+        if (!Array.isArray(group.palette) || group.palette.length < 1 || group.palette.length > 32 ||
+          group.palette.some((color) => typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color))) {
+          errors.push('Palette must contain 1-32 #RRGGBB colours.')
+        }
+        if (!isFiniteIn(group.intensityMin, 0, 1) || !isFiniteIn(group.intensityMax, 0, 1) || group.intensityMin > group.intensityMax) {
+          errors.push('Intensity must be an ordered range from 0 to 1.')
+        }
+        if (!isFiniteIn(group.uv, 0, 1)) errors.push('UV must be 0-1.')
+      }
+    }
+  }
   return [...new Set(errors)]
 }

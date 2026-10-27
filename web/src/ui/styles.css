@@ -156,6 +156,27 @@ input::placeholder { color: #74807d; }
 .connect-card h1 { font-size: 25px; }
 .connect-card p { margin: 0 0 20px; color: #acb6b2; font-size: 13px; line-height: 1.6; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+.selected-mood { border-color: var(--mint); }
+.palette-swatches { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 15px; }
+.palette-swatches span { display: block; width: 25px; height: 25px; border: 1px solid #ffffff44; border-radius: 6px; }
+.mood-group { min-width: 0; margin: 20px 0 0; padding: 16px; border: 1px solid var(--border); border-radius: 9px; }
+.mood-group legend { padding: 0 8px; color: var(--mint); font-weight: 700; }
+.check-label { display: flex; align-items: center; gap: 10px; min-height: 42px; margin-bottom: 12px; }
+.check-label input { width: 22px; height: 22px; accent-color: var(--mint); }
+.palette-editor { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+.palette-stop { display: flex; align-items: end; gap: 5px; min-width: 0; max-width: 100%; }
+.palette-stop input[type="color"] { min-width: 65px; padding: 4px; cursor: pointer; }
+.simulation-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.simulation-controls .field { width: 130px; }
+.tempo-form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.simulation-panel > .subtle { display: block; margin: 16px 0; }
+.fixture-preview { display: flex; align-items: start; gap: 12px; }
+.fixture-preview > div + div { min-width: 0; }
+.preview-light { flex: 0 0 auto; width: 50px; height: 50px; border: 1px solid #ffffff33; border-radius: 50%; }
+.dmx-values { margin: 8px 0 0; color: var(--muted); font: 11px/1.6 monospace; overflow-wrap: anywhere; }
+.dmx-details { margin-top: 20px; color: var(--muted); font-size: 12px; }
+.dmx-details summary { padding: 12px 0; cursor: pointer; }
+.dmx-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow-y: auto; line-height: 1.8; }
 
 @media (max-width: 900px) {
   .app-shell { padding: 0 22px; }
@@ -176,6 +197,7 @@ input::placeholder { color: #74807d; }
   .connection-state { display: none; }
   .content { padding-top: 22px; }
   .section-heading { margin-bottom: 17px; }
+  .moods-page .section-heading { align-items: start; flex-direction: column; }
   .panel { padding: 15px; }
   .panel-heading { flex-direction: column; }
   .template-actions { align-items: flex-start; }
