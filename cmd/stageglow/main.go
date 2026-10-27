@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"stageglowdmx/internal/config"
+	"stageglowdmx/internal/engine"
+	"stageglowdmx/internal/output"
 	"stageglowdmx/internal/server"
 )
 
@@ -30,9 +32,19 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	lighting := engine.New(store.Get(), nil, time.Now().UnixNano())
+	controller := output.New(store.Get(), lighting, nil)
+	defer func() {
+		if err := controller.Shutdown(); err != nil {
+			log.Printf("Output shutdown: %v", err)
+		}
+	}()
+	outputCtx, stopOutput := context.WithCancel(context.Background())
+	defer stopOutput()
+	go controller.Run(outputCtx)
 	srv := &http.Server{
 		Addr:              *listen,
-		Handler:           server.New(store, frontendHandler()),
+		Handler:           server.NewWithOutput(store, frontendHandler(), controller),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -43,7 +55,7 @@ func run() error {
 	defer stop()
 	served := make(chan error, 1)
 	go func() { served <- srv.ListenAndServe() }()
-	log.Printf("StageGlow listening on %s; mood simulation available, Art-Net output disabled", *listen)
+	log.Printf("StageGlow listening on %s; USB output requires explicit enablement, Art-Net unavailable", *listen)
 	select {
 	case err := <-served:
 		if err != nil && err != http.ErrServerClosed {

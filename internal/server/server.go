@@ -15,6 +15,7 @@ import (
 
 	"stageglowdmx/internal/config"
 	"stageglowdmx/internal/engine"
+	"stageglowdmx/internal/output"
 )
 
 const MaxConfigBytes = 2 << 20
@@ -24,7 +25,18 @@ func New(store *config.Store, frontend http.Handler) http.Handler {
 }
 
 func NewWithEngine(store *config.Store, frontend http.Handler, lighting *engine.Engine) http.Handler {
+	return NewWithOutput(store, frontend, output.New(store.Get(), lighting, nil))
+}
+
+func NewWithOutput(store *config.Store, frontend http.Handler, controller *output.Controller) http.Handler {
 	var commands sync.Mutex
+	state := func() any {
+		engineState, status := controller.State()
+		return struct {
+			engine.State
+			Output output.Status `json:"output"`
+		}{engineState, status}
+	}
 	if frontend == nil {
 		frontend = http.NotFoundHandler()
 	}
@@ -61,9 +73,40 @@ func NewWithEngine(store *config.Store, frontend http.Handler, lighting *engine.
 			}
 		case "/api/state":
 			if requireMethod(w, r, http.MethodGet) {
-				writeJSON(w, http.StatusOK, lighting.State())
+				writeJSON(w, http.StatusOK, state())
 			}
-		case "/api/simulation":
+		case "/api/output/ports":
+			if requireMethod(w, r, http.MethodGet) {
+				ports, err := output.Ports()
+				if err != nil {
+					fail(w, http.StatusInternalServerError, err.Error())
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"ports": ports})
+			}
+		case "/api/output":
+			if !requireMethod(w, r, http.MethodPost) {
+				return
+			}
+			var command struct {
+				Enabled *bool `json:"enabled"`
+			}
+			if err := decodeCommand(w, r, &command); err != nil || command.Enabled == nil {
+				fail(w, http.StatusBadRequest, "output command requires enabled: true or false")
+				return
+			}
+			var err error
+			if *command.Enabled {
+				err = controller.Enable()
+			} else {
+				err = controller.Disable()
+			}
+			if err != nil {
+				fail(w, http.StatusConflict, err.Error())
+				return
+			}
+			writeJSON(w, http.StatusOK, state())
+		case "/api/simulation", "/api/lighting":
 			if !requireMethod(w, r, http.MethodPost) {
 				return
 			}
@@ -73,26 +116,25 @@ func NewWithEngine(store *config.Store, frontend http.Handler, lighting *engine.
 				Enabled *bool    `json:"enabled,omitempty"`
 				Value   *float64 `json:"value,omitempty"`
 			}
-			r.Body = http.MaxBytesReader(w, r.Body, 4096)
-			defer r.Body.Close()
-			decoder := json.NewDecoder(r.Body)
-			decoder.DisallowUnknownFields()
-			if err := decoder.Decode(&command); err != nil {
+			if err := decodeCommand(w, r, &command); err != nil {
 				fail(w, http.StatusBadRequest, "invalid simulation command")
 				return
 			}
-			if err := decoder.Decode(new(any)); err != io.EOF {
-				fail(w, http.StatusBadRequest, "simulation command must contain one JSON object")
+			current, _ := controller.State()
+			hardware := r.URL.Path == "/api/lighting"
+			emergency := command.Action == "blackout" && command.Enabled != nil && *command.Enabled
+			if (hardware && !current.OutputEnabled) || (!hardware && current.OutputEnabled && !emergency) {
+				fail(w, http.StatusConflict, "output state changed; refresh and use the matching hardware or simulation controls")
 				return
 			}
 			var err error
 			switch {
 			case command.Action == "select" && command.MoodID != nil && command.Enabled == nil && command.Value == nil:
-				err = lighting.Select(*command.MoodID)
+				err = controller.Select(*command.MoodID)
 			case command.Action == "blackout" && command.Enabled != nil && command.MoodID == nil && command.Value == nil:
-				err = lighting.Blackout(*command.Enabled)
+				err = controller.Blackout(*command.Enabled, hardware)
 			case command.Action == "master" && command.Value != nil && command.MoodID == nil && command.Enabled == nil:
-				err = lighting.SetMaster(*command.Value)
+				err = controller.Master(*command.Value)
 			default:
 				err = fmt.Errorf("use select with moodId, blackout with enabled, or master with value")
 			}
@@ -100,7 +142,7 @@ func NewWithEngine(store *config.Store, frontend http.Handler, lighting *engine.
 				fail(w, http.StatusBadRequest, err.Error())
 				return
 			}
-			writeJSON(w, http.StatusOK, lighting.State())
+			writeJSON(w, http.StatusOK, state())
 		case "/api/config", "/api/config/export", "/api/config/import":
 			methods := []string{http.MethodGet}
 			if r.URL.Path == "/api/config/import" {
@@ -114,6 +156,10 @@ func NewWithEngine(store *config.Store, frontend http.Handler, lighting *engine.
 			if r.Method == http.MethodGet {
 				if r.URL.Path == "/api/config/export" {
 					w.Header().Set("Content-Disposition", `attachment; filename="stageglow-config.json"`)
+					c := store.Get()
+					c.Output = config.Output{Mode: "simulation"}
+					writeJSON(w, http.StatusOK, c)
+					return
 				}
 				writeJSON(w, http.StatusOK, store.Get())
 				return
@@ -130,19 +176,41 @@ func NewWithEngine(store *config.Store, frontend http.Handler, lighting *engine.
 				fail(w, status, err.Error())
 				return
 			}
+			importing := r.URL.Path == "/api/config/import"
+			if importing {
+				c.Output = config.Output{Mode: "simulation"}
+			}
+			if err := controller.CanConfigure(c, importing); err != nil {
+				fail(w, http.StatusConflict, err.Error())
+				return
+			}
 			if err := store.Save(c); err != nil {
 				fail(w, http.StatusInternalServerError, fmt.Sprintf("configuration not saved: %v", err))
 				return
 			}
-			lighting.Configure(store.Get())
-			if r.URL.Path == "/api/config/import" {
-				_ = lighting.Blackout(true)
+			controller.Configure(store.Get())
+			if importing {
+				_ = controller.Blackout(true, false)
 			}
 			writeJSON(w, http.StatusOK, c)
 		default:
 			fail(w, http.StatusNotFound, "API endpoint not found")
 		}
 	})
+}
+
+func decodeCommand(w http.ResponseWriter, r *http.Request, destination any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	defer r.Body.Close()
+	d := json.NewDecoder(r.Body)
+	d.DisallowUnknownFields()
+	if err := d.Decode(destination); err != nil {
+		return err
+	}
+	if err := d.Decode(new(any)); err != io.EOF {
+		return errors.New("command must contain exactly one JSON object")
+	}
+	return nil
 }
 
 func requireMethod(w http.ResponseWriter, r *http.Request, methods ...string) bool {
