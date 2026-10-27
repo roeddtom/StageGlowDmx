@@ -129,7 +129,13 @@ func TestRequestSizeBound(t *testing.T) {
 func TestFailClosedStateRoutingAndMethods(t *testing.T) {
 	h, _, _ := setup(t)
 	w := request(h, http.MethodGet, "/api/state", "")
-	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"blackout":true,"outputEnabled":false,"engineStatus":"not-implemented"}` {
+	var state struct {
+		Blackout      bool   `json:"blackout"`
+		OutputEnabled bool   `json:"outputEnabled"`
+		EngineStatus  string `json:"engineStatus"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &state); err != nil || w.Code != http.StatusOK ||
+		!state.Blackout || state.OutputEnabled || state.EngineStatus != "simulation" {
 		t.Fatal("runtime state is not fail-closed", w.Body.String())
 	}
 	for _, path := range []string{"/api/arm", "/api/blackout", "/api/unknown", "/api"} {

@@ -53,6 +53,24 @@ type ArtNet struct {
 	PortAddress   int    `json:"portAddress"`
 }
 
+type MoodGroup struct {
+	GroupID      string   `json:"groupId"`
+	ColorMode    string   `json:"colorMode"`
+	Palette      []string `json:"palette"`
+	IntensityMin float64  `json:"intensityMin"`
+	IntensityMax float64  `json:"intensityMax"`
+	UV           float64  `json:"uv"`
+}
+
+type Mood struct {
+	ID               string      `json:"id"`
+	Name             string      `json:"name"`
+	BeatsPerChange   float64     `json:"beatsPerChange"`
+	Smoothness       float64     `json:"smoothness"`
+	CrossfadeSeconds float64     `json:"crossfadeSeconds"`
+	Groups           []MoodGroup `json:"groups"`
+}
+
 type Config struct {
 	SchemaVersion   int       `json:"schemaVersion"`
 	Profiles        []Profile `json:"profiles"`
@@ -61,6 +79,7 @@ type Config struct {
 	ActiveLoadoutID string    `json:"activeLoadoutId"`
 	ArtNet          ArtNet    `json:"artNet"`
 	BPM             float64   `json:"bpm"`
+	Moods           []Mood    `json:"moods"`
 }
 
 func Defaults() Config {
@@ -70,6 +89,7 @@ func Defaults() Config {
 		Groups:        []Group{},
 		Loadouts:      []Loadout{},
 		BPM:           120,
+		Moods:         []Mood{},
 	}
 }
 
@@ -83,7 +103,7 @@ func invalid(format string, args ...any) error {
 
 // Decode accepts one complete configuration, never a partial update.
 func Decode(r io.Reader) (Config, error) {
-	var c Config
+	c := Config{Moods: []Mood{}}
 	d := json.NewDecoder(r)
 	var raw json.RawMessage
 	if err := d.Decode(&raw); err != nil {
@@ -138,6 +158,24 @@ func Decode(r io.Reader) (Config, error) {
 	_ = json.Unmarshal(object["artNet"], &artNet)
 	if err := required(artNet, "destinationIp", "portAddress"); err != nil {
 		return c, err
+	}
+	if moods, exists := object["moods"]; exists {
+		var items []map[string]json.RawMessage
+		if err := json.Unmarshal(moods, &items); err != nil {
+			return c, err
+		}
+		for _, item := range items {
+			if err := required(item, "id", "name", "beatsPerChange", "smoothness", "crossfadeSeconds", "groups"); err != nil {
+				return c, err
+			}
+			var settings []map[string]json.RawMessage
+			_ = json.Unmarshal(item["groups"], &settings)
+			for _, setting := range settings {
+				if err := required(setting, "groupId", "colorMode", "palette", "intensityMin", "intensityMax", "uv"); err != nil {
+					return c, err
+				}
+			}
+		}
 	}
 	return c, c.Validate()
 }
@@ -271,7 +309,55 @@ func (c Config) Validate() error {
 	if math.IsNaN(c.BPM) || math.IsInf(c.BPM, 0) || c.BPM < 20 || c.BPM > 300 {
 		return invalid("bpm must be a finite number from 20 to 300")
 	}
+	if err := validateMoods(c.Moods, groups); err != nil {
+		return err
+	}
 	return nil
+}
+
+func validateMoods(moods []Mood, groups map[string]bool) error {
+	if moods == nil {
+		return invalid("moods must be an array, not null")
+	}
+	ids := make(map[string]bool)
+	for _, m := range moods {
+		if err := identity(m.ID, m.Name, "moods", ids); err != nil {
+			return err
+		}
+		if !finiteRange(m.BeatsPerChange, 0.25, 128) || !finiteRange(m.Smoothness, 0.05, 1) ||
+			!finiteRange(m.CrossfadeSeconds, 0, 30) {
+			return invalid("mood %q requires beatsPerChange 0.25-128, smoothness 0.05-1 and crossfadeSeconds 0-30", m.ID)
+		}
+		if m.Groups == nil {
+			return invalid("mood %q groups must be an array", m.ID)
+		}
+		seen := make(map[string]bool)
+		for _, g := range m.Groups {
+			if !groups[g.GroupID] || seen[g.GroupID] {
+				return invalid("mood %q must reference each existing group at most once", m.ID)
+			}
+			seen[g.GroupID] = true
+			if g.ColorMode != "static" && g.ColorMode != "palette" {
+				return invalid("mood %q colorMode must be static or palette", m.ID)
+			}
+			if len(g.Palette) < 1 || len(g.Palette) > 32 {
+				return invalid("mood %q palette must contain 1-32 #RRGGBB colours", m.ID)
+			}
+			for _, color := range g.Palette {
+				if len(color) != 7 || color[0] != '#' || strings.Trim(color[1:], "0123456789abcdefABCDEF") != "" {
+					return invalid("mood %q palette colours must use #RRGGBB", m.ID)
+				}
+			}
+			if !unit(g.IntensityMin) || !unit(g.IntensityMax) || g.IntensityMin > g.IntensityMax || !unit(g.UV) {
+				return invalid("mood %q intensity must be an ordered range from 0 to 1, and UV from 0 to 1", m.ID)
+			}
+		}
+	}
+	return nil
+}
+
+func finiteRange(v, min, max float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= min && v <= max
 }
 
 func clone(c Config) Config {
@@ -284,6 +370,7 @@ func clone(c Config) Config {
 				value := *ch.Value
 				ch.Value = &value
 			}
+
 			if ch.BlackoutValue != nil {
 				value := *ch.BlackoutValue
 				ch.BlackoutValue = &value
@@ -295,5 +382,14 @@ func clone(c Config) Config {
 	for i := range c.Loadouts {
 		c.Loadouts[i].Fixtures = append([]Fixture{}, c.Loadouts[i].Fixtures...)
 	}
+	c.Moods = append([]Mood{}, c.Moods...)
+	for i := range c.Moods {
+		c.Moods[i].Groups = append([]MoodGroup{}, c.Moods[i].Groups...)
+		for j := range c.Moods[i].Groups {
+			c.Moods[i].Groups[j].Palette = append([]string{}, c.Moods[i].Groups[j].Palette...)
+		}
+	}
 	return c
 }
+
+func (c Config) Copy() Config { return clone(c) }

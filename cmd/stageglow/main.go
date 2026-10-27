@@ -43,7 +43,7 @@ func run() error {
 	defer stop()
 	served := make(chan error, 1)
 	go func() { served <- srv.ListenAndServe() }()
-	log.Printf("StageGlow configuration service listening on %s; output disabled (engine not implemented)", *listen)
+	log.Printf("StageGlow listening on %s; mood simulation available, Art-Net output disabled", *listen)
 	select {
 	case err := <-served:
 		if err != nil && err != http.ErrServerClosed {

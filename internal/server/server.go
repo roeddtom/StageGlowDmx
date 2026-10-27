@@ -4,18 +4,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"stageglowdmx/internal/config"
+	"stageglowdmx/internal/engine"
 )
 
 const MaxConfigBytes = 2 << 20
 
 func New(store *config.Store, frontend http.Handler) http.Handler {
+	return NewWithEngine(store, frontend, engine.New(store.Get(), nil, time.Now().UnixNano()))
+}
+
+func NewWithEngine(store *config.Store, frontend http.Handler, lighting *engine.Engine) http.Handler {
+	var commands sync.Mutex
 	if frontend == nil {
 		frontend = http.NotFoundHandler()
 	}
@@ -43,6 +52,8 @@ func New(store *config.Store, frontend http.Handler) http.Handler {
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
+		commands.Lock()
+		defer commands.Unlock()
 		switch r.URL.Path {
 		case "/api/health":
 			if requireMethod(w, r, http.MethodGet) {
@@ -50,12 +61,46 @@ func New(store *config.Store, frontend http.Handler) http.Handler {
 			}
 		case "/api/state":
 			if requireMethod(w, r, http.MethodGet) {
-				writeJSON(w, http.StatusOK, struct {
-					Blackout      bool   `json:"blackout"`
-					OutputEnabled bool   `json:"outputEnabled"`
-					EngineStatus  string `json:"engineStatus"`
-				}{true, false, "not-implemented"})
+				writeJSON(w, http.StatusOK, lighting.State())
 			}
+		case "/api/simulation":
+			if !requireMethod(w, r, http.MethodPost) {
+				return
+			}
+			var command struct {
+				Action  string   `json:"action"`
+				MoodID  *string  `json:"moodId,omitempty"`
+				Enabled *bool    `json:"enabled,omitempty"`
+				Value   *float64 `json:"value,omitempty"`
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, 4096)
+			defer r.Body.Close()
+			decoder := json.NewDecoder(r.Body)
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&command); err != nil {
+				fail(w, http.StatusBadRequest, "invalid simulation command")
+				return
+			}
+			if err := decoder.Decode(new(any)); err != io.EOF {
+				fail(w, http.StatusBadRequest, "simulation command must contain one JSON object")
+				return
+			}
+			var err error
+			switch {
+			case command.Action == "select" && command.MoodID != nil && command.Enabled == nil && command.Value == nil:
+				err = lighting.Select(*command.MoodID)
+			case command.Action == "blackout" && command.Enabled != nil && command.MoodID == nil && command.Value == nil:
+				err = lighting.Blackout(*command.Enabled)
+			case command.Action == "master" && command.Value != nil && command.MoodID == nil && command.Enabled == nil:
+				err = lighting.SetMaster(*command.Value)
+			default:
+				err = fmt.Errorf("use select with moodId, blackout with enabled, or master with value")
+			}
+			if err != nil {
+				fail(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			writeJSON(w, http.StatusOK, lighting.State())
 		case "/api/config", "/api/config/export", "/api/config/import":
 			methods := []string{http.MethodGet}
 			if r.URL.Path == "/api/config/import" {
@@ -88,6 +133,10 @@ func New(store *config.Store, frontend http.Handler) http.Handler {
 			if err := store.Save(c); err != nil {
 				fail(w, http.StatusInternalServerError, fmt.Sprintf("configuration not saved: %v", err))
 				return
+			}
+			lighting.Configure(store.Get())
+			if r.URL.Path == "/api/config/import" {
+				_ = lighting.Blackout(true)
 			}
 			writeJSON(w, http.StatusOK, c)
 		default:
