@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"regexp"
 	"strings"
 )
 
@@ -53,6 +54,11 @@ type ArtNet struct {
 	PortAddress   int    `json:"portAddress"`
 }
 
+type Output struct {
+	Mode       string `json:"mode"`
+	SerialPort string `json:"serialPort"`
+}
+
 type MoodGroup struct {
 	GroupID      string   `json:"groupId"`
 	ColorMode    string   `json:"colorMode"`
@@ -80,6 +86,7 @@ type Config struct {
 	ArtNet          ArtNet    `json:"artNet"`
 	BPM             float64   `json:"bpm"`
 	Moods           []Mood    `json:"moods"`
+	Output          Output    `json:"output"`
 }
 
 func Defaults() Config {
@@ -90,6 +97,7 @@ func Defaults() Config {
 		Loadouts:      []Loadout{},
 		BPM:           120,
 		Moods:         []Mood{},
+		Output:        Output{Mode: "simulation"},
 	}
 }
 
@@ -103,7 +111,7 @@ func invalid(format string, args ...any) error {
 
 // Decode accepts one complete configuration, never a partial update.
 func Decode(r io.Reader) (Config, error) {
-	c := Config{Moods: []Mood{}}
+	c := Config{Moods: []Mood{}, Output: Output{Mode: "simulation"}}
 	d := json.NewDecoder(r)
 	var raw json.RawMessage
 	if err := d.Decode(&raw); err != nil {
@@ -159,6 +167,15 @@ func Decode(r io.Reader) (Config, error) {
 	if err := required(artNet, "destinationIp", "portAddress"); err != nil {
 		return c, err
 	}
+	if data, exists := object["output"]; exists {
+		var output map[string]json.RawMessage
+		if err := json.Unmarshal(data, &output); err != nil {
+			return c, err
+		}
+		if err := required(output, "mode", "serialPort"); err != nil {
+			return c, err
+		}
+	}
 	if moods, exists := object["moods"]; exists {
 		var items []map[string]json.RawMessage
 		if err := json.Unmarshal(moods, &items); err != nil {
@@ -213,6 +230,13 @@ func (c Config) Validate() error {
 	}
 	if c.Profiles == nil || c.Groups == nil || c.Loadouts == nil {
 		return invalid("profiles, groups and loadouts must be arrays, not null or missing")
+	}
+	if c.Output.Mode != "simulation" && c.Output.Mode != "enttec" && c.Output.Mode != "artnet" {
+		return invalid("output.mode must be simulation, enttec or artnet")
+	}
+	if c.Output.SerialPort != "" && (!serialPath.MatchString(c.Output.SerialPort) ||
+		strings.HasSuffix(c.Output.SerialPort, "/.") || strings.HasSuffix(c.Output.SerialPort, "/..")) {
+		return invalid("output.serialPort must be COM1 or higher, /dev/ttyUSB*, /dev/ttyACM*, or /dev/serial/by-id/<device>")
 	}
 	profiles := make(map[string]Profile)
 	ids := make(map[string]bool)
@@ -314,6 +338,8 @@ func (c Config) Validate() error {
 	}
 	return nil
 }
+
+var serialPath = regexp.MustCompile(`^(COM[1-9][0-9]*|/dev/tty(USB|ACM)[0-9]+|/dev/serial/by-id/[A-Za-z0-9_:.+-]+)$`)
 
 func validateMoods(moods []Mood, groups map[string]bool) error {
 	if moods == nil {
