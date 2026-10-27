@@ -1,0 +1,5 @@
+/web/node_modules/
+/cmd/stageglow/web/dist/
+/build/
+/data/
+*.tmp
