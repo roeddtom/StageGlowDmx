@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { makeId, makeMood, makeMoodGroup, removeMood, tapBPM, validateConfig, type Config, type Mood, type MoodGroup, type RuntimeState } from '../model'
+import { MoodSlider } from './MoodSlider'
 
 export type SimulationCommand =
   | { action: 'select'; moodId: string }
@@ -93,8 +94,8 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
       <div className="form-grid two">
         <label className="field">Mood name<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
         <label className="field">Change every (beats)<input type="number" min="0.25" max="128" step="0.25" value={draft.beatsPerChange} onChange={(event) => setDraft({ ...draft, beatsPerChange: Number(event.target.value) })} /></label>
-        <label className="field">Smoothness (0.05-1)<input type="number" min="0.05" max="1" step="0.05" value={draft.smoothness} onChange={(event) => setDraft({ ...draft, smoothness: Number(event.target.value) })} /></label>
-        <label className="field">Crossfade (seconds)<input type="number" min="0" max="30" step="0.5" value={draft.crossfadeSeconds} onChange={(event) => setDraft({ ...draft, crossfadeSeconds: Number(event.target.value) })} /></label>
+        <MoodSlider label="Smoothness" value={draft.smoothness} min={0.05} max={1} step={0.05} endpoints={['Glide then hold', 'Continuous glide']} help="Controls how much of each change interval is spent gliding to the next colour and intensity target. At 1, the glide lasts the whole interval. Lower values reach the target sooner, then hold. This does not change the interval's tempo." onChange={(smoothness) => setDraft({ ...draft, smoothness })} />
+        <MoodSlider label="Crossfade" value={draft.crossfadeSeconds} min={0} max={30} step={0.5} unit="s" help="How many seconds it takes to transition into this mood, including when restoring it from blackout. Zero switches immediately. Blackout itself is always immediate." onChange={(crossfadeSeconds) => setDraft({ ...draft, crossfadeSeconds })} />
       </div>
       <p className="subtle">Smoothness 1 glides for the whole interval; lower values glide then hold. Equal intensity bounds keep brightness fixed. UV defaults to off.</p>
       {config.groups.length === 0 && <p className="empty-state">Define groups on the Fixtures page first.</p>}
@@ -110,8 +111,8 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
             <div className="form-grid two">
               <label className="field">Colour mode - {group.name}<select value={settings.colorMode} onChange={(event) => editGroup(group.id, { colorMode: event.target.value as MoodGroup['colorMode'] })}><option value="static">Static (first colour)</option><option value="palette">Independent palette drift</option></select></label>
               <label className="field">UV - {group.name} (0-1)<input type="number" min="0" max="1" step="0.01" value={settings.uv} onChange={(event) => editGroup(group.id, { uv: Number(event.target.value) })} /></label>
-              <label className="field">Minimum intensity - {group.name}<input type="number" min="0" max="1" step="0.01" value={settings.intensityMin} onChange={(event) => editGroup(group.id, { intensityMin: Number(event.target.value) })} /></label>
-              <label className="field">Maximum intensity - {group.name}<input type="number" min="0" max="1" step="0.01" value={settings.intensityMax} onChange={(event) => editGroup(group.id, { intensityMax: Number(event.target.value) })} /></label>
+              <MoodSlider label={`Minimum intensity - ${group.name}`} value={settings.intensityMin} min={0} max={100} step={1} scale={100} unit="%" help="The dimmest target for this group, before master brightness. Each fixture gently varies between minimum and maximum. Set both to the same percentage for steady brightness. Minimum must not exceed maximum." onChange={(intensityMin) => editGroup(group.id, { intensityMin })} />
+              <MoodSlider label={`Maximum intensity - ${group.name}`} value={settings.intensityMax} min={0} max={100} step={1} scale={100} unit="%" help="The brightest target for this group, before master brightness. Keep this at or above minimum. Equal minimum and maximum values hold brightness steady; 0% is dark and 100% is full intensity." onChange={(intensityMax) => editGroup(group.id, { intensityMax })} />
             </div>
             <div className="palette-editor">
               {settings.palette.map((color, index) => <div className="palette-stop" key={index}>

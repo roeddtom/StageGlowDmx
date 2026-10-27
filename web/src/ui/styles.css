@@ -212,6 +212,15 @@ input::placeholder { color: #74807d; }
 }
 .patch-controls { border: 0; padding: 0; margin: 0; min-width: 0; }
 .output-panel { margin-bottom: 24px; }
+.slider-heading { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.control-help { flex: 0 0 36px; min-height: 36px; padding: 0; border: 1px solid #53675e; border-radius: 50%; background: #25352d; color: var(--mint); font-weight: 800; }
+.control-help:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+.slider-inputs { display: flex; align-items: center; gap: 12px; }
+.mood-slider input[type="range"] { flex: 1; min-width: 0; width: 100%; height: 44px; margin: 0; padding: 0; border: 0; background: transparent; accent-color: var(--mint); cursor: pointer; }
+.slider-number { flex: 0 0 105px; display: flex; gap: 5px; align-items: center; }
+.slider-number input { min-width: 0; width: 100%; }
+.slider-endpoints { display: flex; justify-content: space-between; gap: 8px; padding-right: 117px; color: var(--muted); font-size: 10px; font-weight: 400; }
+.control-help-text { margin: 0; padding: 10px 12px; border-left: 2px solid var(--mint); background: #1d2b24; color: #c2d8cd; font-size: 12px; font-weight: 400; line-height: 1.5; }
 
 .show-assignments { margin-top: 20px; }
 .show-screen { position: fixed; inset: 0; height: 100vh; height: 100dvh; display: flex; flex-direction: column; gap: 6px; padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); background: #0c1010; overflow: hidden; }

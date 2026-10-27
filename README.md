@@ -49,6 +49,8 @@ Frontend tests use Node's built-in test runner.
    Front steady and gives other groups a blue/purple palette. Edit colours,
    intensity bounds, UV, beats per change, smoothness, and crossfade duration.
    Equal intensity bounds hold brightness steady; excluded groups stay dark.
+   Intensity, smoothness, and crossfade have sliders with precise numeric inputs.
+   Intensity is shown as a percentage; the **?** buttons explain each control.
 3. Apply the mood and wait for Saved. Select it in the mood list, then explicitly
    start the simulation. Inspect fixture colours and generated DMX values.
 
