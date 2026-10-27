@@ -78,7 +78,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
       setFullscreenError('')
     } catch { setFullscreenError('Browser fullscreen unavailable. The show grid still fills this window.') }
   }
-  return <main className="show-screen" aria-label="Show performance controls">
+  return <main className={`show-screen ${runtime?.blackout ? 'is-blacked-out' : ''}`} aria-label="Show performance controls">
     <header className="show-toolbar">
       <div className={`show-status ${!runtime || fault ? 'show-warning' : ''}`} role="status">
         <strong>{!runtime ? 'DISCONNECTED - OUTPUT UNKNOWN' : fault ? 'USB FAULT - LIGHTS MAY STAY ON' : hardware ? 'USB OUTPUT' : 'SIMULATION - USB DISABLED'}</strong>
