@@ -23,6 +23,9 @@ than WebSockets. Operator ownership, physical Pi boot verification, and real
 fixture/controller commissioning remain pending. Deployment instructions and
 a systemd unit are provided but have not been tested on the physical Pi.
 
+ENTTEC DMX USB PRO support is now planned as the first hardware-output milestone
+for home testing. It is not implemented yet; Art-Net remains the venue output.
+
 ## Goal and agreed scope
 
 Create gentle, evolving stage lighting that a musician can operate from a
@@ -33,6 +36,8 @@ cloud services, accounts, CDNs, or an internet connection during a show.
 Release one supports:
 
 - One Art-Net universe and approximately 8-16 mixed RGB, RGBA, and RGBWAUV fixtures.
+- Alternative single-universe output through the existing ENTTEC DMX USB PRO,
+  for home testing without the venue's Art-Net controller.
 - Manually defined, reusable fixture profiles and saved rig loadouts.
 - Named fixture groups such as Front, Back, Side Left, and Side Right.
 - Static colours or independently drifting colours from a chosen palette.
@@ -57,7 +62,8 @@ Recommended software:
 
 - A currently supported Raspberry Pi OS Lite image compatible with the exact
   Pi 2 revision, preferably 32-bit for a common ARMv7 deployment target.
-- A Go backend owning configuration, mood timing, DMX rendering, and Art-Net UDP.
+- A Go backend owning configuration, mood timing, DMX rendering, and either
+  ENTTEC USB output or Art-Net UDP.
 - A React/TypeScript frontend built with Vite and served locally by the backend.
 - HTTP APIs for configuration and commands, with a WebSocket for live state.
 - Versioned JSON configuration, atomically saved on disk, with a last-known-good
@@ -146,13 +152,19 @@ and the selected global BPM. Do not persist an armed/output-enabled state.
 After process or Pi restart, always initialize in blackout; never automatically
 resume light output from a saved mood.
 
+Persist the selected output backend and its settings, but not output enablement.
+Support Simulation, ENTTEC DMX USB PRO, and Art-Net as mutually exclusive modes.
+Keep output settings separate from fixture loadouts: changing the connection at
+the venue must not require recreating moods, groups, or DMX addresses. Existing
+backups default to Simulation when output settings are absent.
+
 Imports are schema-versioned and validated in full before replacing configuration.
 Export configuration rather than transient DMX frames. Require blackout for an
 import, retain the previous valid configuration, and reject unsupported future
 schema versions with an actionable message. Corrupt configuration must not arm
 output or silently overwrite the last-known-good backup.
 
-## Lighting engine and Art-Net
+## Lighting engine and output transports
 
 Keep the renderer separate from networking and browser code. Use monotonic time
 and injectable clocks/randomness so output behavior is repeatably testable.
@@ -189,6 +201,61 @@ retiming future targets without snapping. Label timing as "every 4 beats" or
 8 beats is 4 seconds. Smoothness controls the proportion of each interval spent
 gliding rather than holding.
 
+### Shared output lifecycle
+
+Feed the same complete, safety-processed 512-channel frame into one selected
+transport. Keep transport code outside the mood generator. Use a small shared
+output interface for opening, writing frames, reporting status, and closing;
+do not implement a general plugin system.
+
+Hardware output requires explicit enablement and starts with blackout frames.
+Releasing simulation blackout alone must never enable physical output.
+Changing transports or device settings requires blackout and disables output
+until explicitly re-enabled. Never send to USB and Art-Net simultaneously,
+silently fall back to another transport, or automatically re-arm after a fault.
+Bound transport writes and retain only the latest pending frame, so a slow or
+failed device cannot stall the mood clock or accumulate obsolete transitions.
+
+### ENTTEC DMX USB PRO: home testing first
+
+Connect the interface by USB to the machine running the Go backend, normally
+the Raspberry Pi, and connect its DMX output to the home fixture chain. The
+phone remains a browser controller; this is not browser WebUSB or Android USB
+support. No Art-Net node is needed for this path.
+
+Target the original ENTTEC DMX USB PRO first. Confirm the exact model and its
+official programming documentation before implementation; do not assume the
+Open DMX USB, USB PRO Mk2, or compatible-looking interfaces use identical
+protocols or device setup.
+
+Implement its documented framed USB/serial protocol and DMX output command.
+Include the DMX start code and all 512 channel values; let the PRO hardware
+generate DMX wire timing rather than trying to bit-bang it from the Pi.
+Check the documented device refresh limits when selecting the host update rate.
+Identify the smallest maintained Go serial dependency that supports Linux ARMv7
+and Windows without unnecessarily losing the existing cross-build workflow.
+
+On the Pi, prefer a stable serial-device identity, such as a supported
+`/dev/serial/by-id/` path, rather than assuming `/dev/ttyUSB0`. Offer device
+selection/refresh and show a useful error when absent, busy, unsupported, or
+permission-denied. Set serial parameters according to the official API, and
+ensure another lighting application is not holding the interface open.
+For local Windows development, support the corresponding COM port when its
+driver and the physical device are available.
+
+Extend appliance setup with the necessary USB serial driver and service-user
+device permissions. Review systemd device access and group membership on the
+actual Pi OS image; never run the lighting service as root just to access USB.
+Keep device selection machine-local or explicitly remap imported USB paths,
+since a Windows COM port will not be valid on the Pi.
+
+On USB disconnect or write failure, report a fault, disable output, and latch
+blackout. Reconnection may make the device available again but requires explicit
+re-enablement starting with blackout frames. Attempt safe blackout before a
+normal disable or shutdown while the device is writable.
+
+### Art-Net: venue output
+
 Implement ArtDmx over UDP port 6454, initially using a manually configured
 unicast node IP and Art-Net Port-Address. Clearly distinguish the node's universe
 label from protocol addressing; confirm the mapping against the actual controller.
@@ -205,7 +272,8 @@ controller connectivity.
 ### 1. Fixtures and loadouts
 
 Profile editor, fixture patch table, group assignment, loadout save/duplicate,
-address-conflict feedback, guarded preview, and Art-Net destination settings.
+address-conflict feedback, guarded preview, and output mode/settings. Show USB
+device selection for ENTTEC and destination/universe settings for Art-Net.
 Keep advanced/raw DMX details away from the show page.
 
 ### 2. Mood editor
@@ -237,13 +305,16 @@ made safe by assuming every unused channel should be zero.
 UV is opt-in and defaults to zero. A software intensity limit is not a guarantee
 of safe UV exposure; fixture guidance and venue practices still apply.
 
-The app cannot guarantee blackout if the Pi loses power, Ethernet is unplugged,
-or the Art-Net node stops receiving packets. Identify and configure the node's
-DMX-loss behavior during commissioning and physically verify it. Recommend a
-hardware-accessible means of stopping light output.
+The app cannot guarantee blackout if the Pi loses power, Ethernet or USB is
+unplugged, or an output device stops receiving updates. A buffered USB interface
+may retain its last frame; do not assume closing its serial port stops DMX or
+turns fixtures off. Physically test the ENTTEC's behavior on application crash,
+USB removal, and host power loss. Identify and configure the Art-Net node's
+DMX-loss behavior during commissioning and physically verify it too. Recommend
+a hardware-accessible means of stopping light output.
 
 On graceful shutdown, attempt to send safe blackout frames, but never treat
-that as a substitute for node-side loss-of-signal behavior.
+that as a substitute for verified hardware loss-of-signal behavior.
 
 ## Implementation milestones and commits
 
@@ -257,15 +328,18 @@ unrelated changes, generated build outputs, or deployment-specific secrets.
 | 1. Skeleton | Go service, bundled React UI, shared API contract, local development scripts | Serve the built app offline; produce an ARMv7 binary |
 | 2. Configuration | Profiles, groups, loadouts, validated patching, atomic persistence, import/export | Invalid/overlapping patches rejected; backup round-trip and restart recovery |
 | 3. Engine | Static/palette moods, intensity drift, colour mixing, tap tempo, crossfades, blackout | Deterministic engine tests cover timing, bounds, continuity, and safety overrides |
-| 4. Art-Net | Single-universe unicast sender and output diagnostics | Packet-level receiver tests; real node emits expected steady colours and blackout |
+| 4a. ENTTEC home output | Shared transport lifecycle, output-mode selection, DMX USB PRO sender, USB diagnostics and Pi permissions | Protocol tests; home fixtures reproduce simulated moods; enable/disable, blackout, USB loss/reconnect, and restart behavior physically verified |
+| 4b. Art-Net venue output | Single-universe unicast sender using the same engine frames and lifecycle | Packet-level receiver tests; real node emits expected steady colours and blackout |
 | 5. Editors | Profile/loadout and mood editors, simulation and guarded live preview | Complete a rig and reusable moods through the UI without editing files |
 | 6. Performance UI | Show slots, Break, master level, tap tempo, operator ownership, edit lock | Touchscreen operation and reconnect behavior work without interrupting output |
 | 7. Appliance deployment | OS setup guide, service installation, backup/restore and commissioning checklist | Pi boots blacked out and serves the app without internet; live-rig rehearsal |
 
-Dependencies: configuration precedes engine integration; engine precedes live
-Art-Net integration; both precede live preview and performance acceptance.
-The hardware-free UI skeleton and simulation can be developed before obtaining
-the controller model.
+Dependencies: configuration and the engine precede transport integration.
+Implement milestone 4a before 4b so home mood testing does not wait for access
+to the venue controller. USB acceptance enables home testing and guarded
+hardware preview, not a claim that Art-Net has been commissioned. Art-Net
+acceptance remains required before using that output at a show. The same saved
+loadout and moods must work through either transport without repatching.
 
 ## Verification strategy
 
@@ -275,6 +349,14 @@ the controller model.
   interrupted fades, blackout precedence, and startup blackout.
 - Art-Net integration tests: capture local UDP packets and assert destination,
   addressing, packet format, frame contents, and blackout output.
+- ENTTEC transport tests: verify framing, documented command and length fields,
+  start code, full universe payload, partial writes, timeouts, disconnects, and
+  close/reopen errors using a fake serial connection. Test that faults and
+  transport switches cannot re-arm output or replay stale frames.
+- Home hardware acceptance: connect the real DMX USB PRO and representative
+  fixtures; compare static colours, drift, intensity, UV, and transitions against
+  simulation. Verify blackout, ordinary disable, process restart, USB removal,
+  and deliberate re-enable after reconnection. Record actual last-frame behavior.
 - UI tests: configuration creation, error handling, mood selection, Break,
   blackout latch/release, disconnected controls, and backup import/export.
 - End-to-end tests with a simulated node: browser disconnect/reconnect, operator
@@ -312,10 +394,15 @@ for each commit.
 ## Hardware details to resolve before live output
 
 - Exact Pi 2 revision, compatible OS image, power supply, and storage condition.
+- Exact ENTTEC DMX USB PRO model/revision, documented API, available USB cable,
+  stable device identity, OS driver, permissions, and behavior on lost updates.
+- Which home fixtures and required DMX cables/adapters are available for the
+  first USB commissioning test; use the same fixture profiles as at the venue.
 - Art-Net controller model, IP/subnet, Port-Address mapping, and DMX-loss options.
 - Fixture manuals and channel modes, especially shutter/strobe/macro channels.
 - Router address reservation for the Pi and node; provide an IP fallback if
   local hostname resolution is unavailable.
 
-Unknown hardware details do not block the configuration UI or simulated engine.
-They do block declaring the system ready for a live show.
+Unknown Art-Net hardware details do not block implementing or commissioning
+ENTTEC home output. Each physical transport must be verified independently;
+USB success alone does not declare the Art-Net show system ready.
