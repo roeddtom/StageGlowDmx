@@ -1,5 +1,19 @@
 # StageGlowDmx implementation plan
 
+## Implementation status (2026-10-27)
+
+The first configuration slice is implemented: a Go HTTP service with bundled
+React UI, validated fixture profiles/groups/loadouts, channel conflict checks,
+atomic local persistence with backups, and import/export. Host and Linux ARMv7
+builds are available through the Windows build script. Phone/tablet browser
+flows and process-restart persistence have been exercised locally.
+
+The UI deliberately labels Moods and Show as not ready. There is no lighting
+engine, live preview, Art-Net sender, or output-enable control yet. Runtime state
+is always blacked out. Operator ownership, physical Pi boot verification, and
+real fixture/controller commissioning remain pending. Deployment instructions
+and a systemd unit are provided but have not been tested on the physical Pi.
+
 ## Goal and agreed scope
 
 Create gentle, evolving stage lighting that a musician can operate from a
