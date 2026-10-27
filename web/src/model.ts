@@ -43,6 +43,10 @@ export type RuntimeState = {
   activeMoodId: string
   bpm: number
   master: number
+  output: {
+    mode: string; port: string; enabled: boolean; state: string
+    error: string; framesSent: number; cleanupPending: boolean
+  }
   dmx: number[]
   fixtures: {
     id: string; name: string; groupId: string; startAddress: number
@@ -58,6 +62,7 @@ export type Config = {
   artNet: { destinationIp: string; portAddress: number }
   bpm: number
   moods: Mood[]
+  output: { mode: 'simulation' | 'enttec' | 'artnet'; serialPort: string }
 }
 
 export const emptyConfig = (): Config => ({
@@ -69,6 +74,7 @@ export const emptyConfig = (): Config => ({
   artNet: { destinationIp: '', portAddress: 0 },
   bpm: 120,
   moods: [],
+  output: { mode: 'simulation', serialPort: '' },
 })
 
 export function makeMoodGroup(group: Group, evolving = false): MoodGroup {
@@ -154,7 +160,7 @@ export function validateConfig(input: unknown): string[] {
     for (const key of Object.keys(value)) if (![...required, ...optional].includes(key)) errors.push(`${label} contains unsupported field "${key}".`)
     return true
   }
-  checkShape(input, 'Configuration', ['schemaVersion', 'profiles', 'groups', 'loadouts', 'activeLoadoutId', 'artNet', 'bpm'], ['moods'])
+  checkShape(input, 'Configuration', ['schemaVersion', 'profiles', 'groups', 'loadouts', 'activeLoadoutId', 'artNet', 'bpm'], ['moods', 'output'])
   const config = input as Partial<Config>
   if (config.schemaVersion !== 1) errors.push('Only configuration schema version 1 is supported.')
   if (!Array.isArray(config.profiles) || !Array.isArray(config.groups) || !Array.isArray(config.loadouts)) {
@@ -170,6 +176,14 @@ export function validateConfig(input: unknown): string[] {
     if (!isIntegerIn(config.artNet.portAddress, 0, 32767)) errors.push('Art-Net Port-Address must be between 0 and 32767.')
   }
   if (!isFiniteIn(config.bpm, 20, 300)) errors.push('BPM must be between 20 and 300.')
+  if ('output' in input && checkShape(config.output, 'Output settings', ['mode', 'serialPort'])) {
+    if (!['simulation', 'enttec', 'artnet'].includes(config.output.mode)) errors.push('Output mode must be simulation, enttec, or artnet.')
+    const port = config.output.serialPort
+    if (typeof port !== 'string' || (port !== '' && (
+      !/^(COM[1-9][0-9]*|\/dev\/tty(USB|ACM)[0-9]+|\/dev\/serial\/by-id\/[A-Za-z0-9_:.+-]+)$/.test(port) ||
+      port === '/dev/serial/by-id/.' || port === '/dev/serial/by-id/..'
+    ))) errors.push('Serial port must be COMn, /dev/ttyUSBn, /dev/ttyACMn, or a /dev/serial/by-id/ path.')
+  }
 
   const uniqueIds = (items: { id: string }[], label: string) => {
     const seen = new Set<string>()

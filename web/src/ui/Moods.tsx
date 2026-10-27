@@ -24,6 +24,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
   const taps = useRef<number[]>([])
   const moods = config.moods ?? []
   const active = moods.find((mood) => mood.id === runtime?.activeMoodId)
+  const hardware = runtime?.outputEnabled === true
   const loadout = config.loadouts.find((item) => item.id === config.activeLoadoutId)
   const unpatchedGroups = active?.groups.filter((group) => !loadout?.fixtures.some((fixture) => fixture.groupId === group.groupId))
   useEffect(() => {
@@ -58,7 +59,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
 
   return <div className="moods-page">
     <div className="section-heading">
-      <div><div className="section-kicker">GENTLE, EVOLVING LIGHT</div><h1>Moods</h1><p>Keep front lights steady while other groups glide through a palette. All previews are software-only.</p></div>
+      <div><div className="section-kicker">GENTLE, EVOLVING LIGHT</div><h1>Moods</h1><p>Keep front lights steady while other groups glide through a palette. {!runtime ? 'Output state is unknown; real fixtures may still be lit.' : hardware ? 'Controls now affect real fixtures through USB.' : 'USB is disabled; mood controls affect software only.'}</p></div>
       <div className="button-row">
         <button className="button" onClick={() => { setDraft(makeMood(config.groups, true)); setError('') }}>Starter mood</button>
         <button className="button primary" onClick={() => { setDraft(makeMood(config.groups)); setError('') }}>New mood</button>
@@ -66,7 +67,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
     </div>
 
     <section className="panel">
-      <div className="panel-heading"><div><div className="section-kicker">SAVED BEHAVIORS</div><h2>Your moods</h2><p>Selecting a mood does not release simulation blackout. Apply and save edits before previewing them.</p></div></div>
+      <div className="panel-heading"><div><div className="section-kicker">SAVED BEHAVIORS</div><h2>Your moods</h2><p>Selecting a mood never releases blackout. When already running, mood selection and saved edits affect output immediately.</p></div></div>
       <div className="profile-grid">
         {moods.length === 0 && <p className="empty-state">No moods yet. Create a starter mood after defining fixture groups.</p>}
         {moods.map((mood) => <article className={`profile-card ${active?.id === mood.id ? 'selected-mood' : ''}`} key={mood.id}>
@@ -78,7 +79,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
             <button className="text-button" onClick={() => { setDraft(structuredClone(mood)); setError('') }} aria-label={`Edit ${mood.name}`}>Edit</button>
             <button className="text-button" onClick={() => { setDraft({ ...structuredClone(mood), id: makeId(), name: `${mood.name} copy` }); setError('') }} aria-label={`Duplicate ${mood.name}`}>Duplicate</button>
             <button className="text-button danger-text" onClick={() => {
-              if (!window.confirm(`Delete mood "${mood.name}"? Deleting the selected mood blacks out the simulation.`)) return
+              if (!window.confirm(`Delete mood "${mood.name}"? Deleting the selected mood blacks out the generated output.`)) return
               onUpdate({ ...config, moods: moods.filter((item) => item.id !== mood.id) })
               if (draft?.id === mood.id) setDraft(null)
             }} aria-label={`Delete mood ${mood.name}`}>Delete</button>
@@ -127,11 +128,14 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
     </section>}
 
     <section className="panel simulation-panel">
-      <div className="panel-heading"><div><div className="section-kicker">SOFTWARE PREVIEW / NO ART-NET</div><h2>Mood simulation</h2><p>The server clock keeps advancing between browser visits. Selecting a mood while running crossfades smoothly.</p></div><span className="disabled-chip">NO HARDWARE OUTPUT</span></div>
-      <p>Selected: <strong>{active?.name ?? 'None'}</strong> | {runtime ? (runtime.blackout ? 'Simulation blacked out' : 'Simulation running') : 'Simulation unavailable'}</p>
+      <div className="panel-heading"><div><div className="section-kicker">{hardware ? 'PHYSICAL USB OUTPUT / NO ART-NET' : 'SOFTWARE PREVIEW / NO ART-NET'}</div><h2>{hardware ? 'USB mood control' : 'Mood simulation'}</h2><p>The server clock keeps advancing between browser visits. Selecting a mood while running crossfades smoothly.</p></div><span className="disabled-chip">{!runtime ? 'OUTPUT UNKNOWN' : hardware ? 'USB ENABLED' : 'USB DISABLED'}</span></div>
+      <p>Selected: <strong>{active?.name ?? 'None'}</strong> | {runtime ? (runtime.blackout ? 'Generated blackout latched' : 'Mood running') : 'Output state unknown; lights may still be running'}</p>
       <div className="simulation-controls">
-        <button className="button danger-button" disabled={busy || !runtime} onClick={() => void onCommand({ action: 'blackout', enabled: true })}>Blackout simulation</button>
-        <button className="button primary" disabled={!ready || busy || !active || !runtime?.blackout} onClick={() => void onCommand({ action: 'blackout', enabled: false })}>Start / restore simulation</button>
+        <button className="button danger-button" disabled={busy} onClick={() => void onCommand({ action: 'blackout', enabled: true })}>{hardware ? 'Blackout USB output' : 'Blackout simulation'}</button>
+        <button className="button primary" disabled={!ready || busy || !active || !runtime?.blackout} onClick={() => {
+          if (hardware && !window.confirm('Release physical USB blackout and light real fixtures with the selected mood? Check master brightness and clear the stage first.')) return
+          void onCommand({ action: 'blackout', enabled: false })
+        }}>{hardware ? 'Release USB blackout (real lights)' : 'Start / restore simulation'}</button>
         <label className="field">Master brightness<select value={runtime?.master ?? 1} disabled={busy || !ready} onChange={(event) => void onCommand({ action: 'master', value: Number(event.target.value) })}>{[0, 0.1, 0.25, 0.5, 0.75, 1].map((value) => <option key={value} value={value}>{Math.round(value * 100)}%</option>)}</select></label>
         <form className="tempo-form" onSubmit={(event) => {
           event.preventDefault()
@@ -145,7 +149,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
         </form>
         <button className="button" onClick={tap}>Tap tempo</button>
       </div>
-      <p className="subtle">{active ? `${active.beatsPerChange} beats at ${config.bpm} BPM = ${(active.beatsPerChange * 60 / config.bpm).toFixed(2)} seconds per change.` : 'Select a saved mood, then start the simulation.'} {!ready && ' Save pending or backend unavailable; previews are not current.'}</p>
+      <p className="subtle">{active ? `${active.beatsPerChange} beats at ${config.bpm} BPM = ${(active.beatsPerChange * 60 / config.bpm).toFixed(2)} seconds per change.` : 'Select a saved mood, then explicitly release blackout.'} {!ready && ' Save pending or backend unavailable; previews are not current.'} {hardware && 'Values below are generated output, not fixture feedback.'}</p>
       {!config.activeLoadoutId && <p className="empty-state">Choose an active loadout on the Fixtures page to see generated fixture output.</p>}
       {unpatchedGroups && unpatchedGroups.length > 0 && <p className="subtle">No fixtures in the active loadout for: {unpatchedGroups.map((group) => config.groups.find((item) => item.id === group.groupId)?.name).join(', ')}.</p>}
       <div className="profile-grid">

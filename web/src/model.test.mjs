@@ -12,6 +12,22 @@ function patchedRig() {
 }
 
 describe('configuration validation', () => {
+  it('accepts legacy output defaults and only safe machine-local serial paths', () => {
+    const config = patchedRig()
+    delete config.output
+    assert.deepEqual(validateConfig(config), [])
+    for (const serialPort of ['', 'COM3', '/dev/ttyUSB0', '/dev/ttyACM1', '/dev/serial/by-id/usb-ENTTEC_123-if00-port0']) {
+      config.output = { mode: 'enttec', serialPort }
+      assert.deepEqual(validateConfig(config), [])
+    }
+    for (const output of [null, {}, { mode: 'raw', serialPort: '' }, { mode: 'enttec', serialPort: '/etc/passwd' },
+      { mode: 'enttec', serialPort: '/dev/serial/by-id/..' }, { mode: 'enttec', serialPort: 'COM0' },
+      { mode: 'enttec', serialPort: '', enabled: true }]) {
+      config.output = output
+      assert.ok(validateConfig(config).length > 0)
+    }
+  })
+
   it('accepts a valid profile and fixture patch', () => {
     assert.deepEqual(validateConfig(patchedRig()), [])
   })

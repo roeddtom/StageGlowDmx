@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -128,9 +129,9 @@ func TestEnableStartsWithSafeFrameAndRequiresHardwareRelease(t *testing.T) {
 
 func TestUSBFailureLatchesBlackoutAndNeverReconnects(t *testing.T) {
 	d := &recordingDevice{}
-	opens := 0
 	c := readyController(t, d)
-	c.open = func(string) (Device, error) { opens++; return d, nil }
+	var opens atomic.Int32
+	c.open = func(string) (Device, error) { opens.Add(1); return d, nil }
 	if err := c.Enable(); err != nil {
 		t.Fatal(err)
 	}
@@ -143,8 +144,8 @@ func TestUSBFailureLatchesBlackoutAndNeverReconnects(t *testing.T) {
 		c.Tick()
 	}
 	state, status := c.State()
-	if status.Enabled || status.State != "fault" || status.Error == "" || !state.Blackout || opens != 1 {
-		t.Fatal("fault did not fail closed", state, status, opens)
+	if status.Enabled || status.State != "fault" || status.Error == "" || !state.Blackout || opens.Load() != 1 {
+		t.Fatal("fault did not fail closed", state, status, opens.Load())
 	}
 }
 
@@ -249,6 +250,48 @@ func TestBackgroundCadenceRunsWithoutBrowser(t *testing.T) {
 	d.mu.Unlock()
 	if count < 4 {
 		t.Fatal("frames did not continue without a browser", count)
+	}
+	c.Shutdown()
+}
+
+func TestLateOpenIsRetiredBeforeRetry(t *testing.T) {
+	gate := make(chan struct{})
+	d := &recordingDevice{}
+	c := readyController(t, d)
+	var opens atomic.Int32
+	c.open = func(string) (Device, error) {
+		opens.Add(1)
+		<-gate
+		return d, nil
+	}
+	if err := c.Enable(); err == nil {
+		t.Fatal("blocked open must time out")
+	}
+	state, status := c.State()
+	if state.OutputEnabled || !state.Blackout || status.State != "fault" || !status.CleanupPending {
+		t.Fatal("timed out open must disarm and gate cleanup", state, status)
+	}
+	if c.Enable() == nil || opens.Load() != 1 {
+		t.Fatal("retry opened a second connection during cleanup")
+	}
+	close(gate)
+	waitCleanup(t, c)
+	if !d.closed || len(d.frames) != 0 {
+		t.Fatal("late connection must be closed without sending stale data")
+	}
+	c.Shutdown()
+}
+
+func TestCloseFailureRequiresRestart(t *testing.T) {
+	c := readyController(t, &recordingDevice{closeErr: errors.New("driver close failed")})
+	if err := c.Enable(); err != nil {
+		t.Fatal(err)
+	}
+	c.Disable()
+	waitCleanup(t, c)
+	_, status := c.State()
+	if status.State != "fault" || status.Error == "" || c.Enable() == nil {
+		t.Fatal("failed close must prevent another connection", status)
 	}
 	c.Shutdown()
 }

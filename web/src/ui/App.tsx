@@ -4,6 +4,7 @@ import {
   type ChannelKind, type Config, type Fixture, type Group, type Loadout, type Profile, type ProfileChannel, type RuntimeState,
 } from '../model'
 import { Moods, type SimulationCommand } from './Moods'
+import { Output } from './Output'
 
 type Page = 'fixtures' | 'moods' | 'show'
 
@@ -208,12 +209,29 @@ export function App() {
     commandVersion.current++
     setCommandBusy(true)
     try {
-      const state = await request<RuntimeState>('/api/simulation', { method: 'POST', body: JSON.stringify(command) })
+      const state = await request<RuntimeState>(runtime?.outputEnabled ? '/api/lighting' : '/api/simulation', { method: 'POST', body: JSON.stringify(command) })
       setRuntime(state)
       setBackendConnected(true)
     } catch (error) {
       if (error instanceof ApiError && error.status === 0) { setBackendConnected(false); setRuntime(null) }
-      setNotice(error instanceof Error ? error.message : 'Simulation command failed.')
+      setNotice(error instanceof Error ? error.message : 'Lighting command failed.')
+    } finally {
+      commandVersion.current++
+      setCommandBusy(false)
+    }
+  }
+
+  const enableOutput = async (enabled: boolean) => {
+    if (commandBusy) return
+    commandVersion.current++
+    setCommandBusy(true)
+    try {
+      setRuntime(await request<RuntimeState>('/api/output', { method: 'POST', body: JSON.stringify({ enabled }) }))
+      setBackendConnected(true)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Output command failed.')
+      try { setRuntime(await request<RuntimeState>('/api/state')) }
+      catch { setRuntime(null); setBackendConnected(false) }
     } finally {
       commandVersion.current++
       setCommandBusy(false)
@@ -249,8 +267,10 @@ export function App() {
 
       <div className="safety-banner" role="status">
         <span className="safety-icon">!</span>
-        <span><strong>Simulation only - Art-Net output disabled.</strong> Generated DMX stays in software.</span>
-        <span className={runtime?.blackout ? 'blackout-pill' : 'blackout-pill unconfirmed'}><i /> {runtime ? (runtime.blackout ? 'SIM BLACKOUT' : 'SIM RUNNING') : 'SIM UNKNOWN'}</span>
+        <span><strong>{!runtime ? 'Output state unknown.' : runtime.outputEnabled ? 'Physical USB output enabled.' : runtime.output.state === 'fault' ? 'USB output fault - check fixtures.' : 'USB output disabled / simulation only.'}</strong> {!runtime ? 'Connection lost; lights may still be running.' : runtime.output.state === 'fault' ? 'The interface may retain its last frame. Art-Net unavailable.' : 'Art-Net unavailable. Frame writes do not confirm fixture state.'}</span>
+        <span className={runtime?.blackout ? 'blackout-pill' : 'blackout-pill unconfirmed'}><i /> {runtime ? `${runtime.outputEnabled ? 'USB' : 'SIM'} ${runtime.blackout ? 'BLACKOUT' : 'RUNNING'}` : 'UNKNOWN'}</span>
+        <button className="button danger-button small" disabled={commandBusy} onClick={() => void simulation({ action: 'blackout', enabled: true })}>Blackout</button>
+        {(runtime?.outputEnabled || !runtime) && <button className="button small" disabled={commandBusy} onClick={() => void enableOutput(false)}>Disable USB</button>}
       </div>
 
       <nav className="main-nav" aria-label="Main navigation">
@@ -266,7 +286,11 @@ export function App() {
       </nav>
 
       <main className="content">
-        <div hidden={page !== 'fixtures'}><Fixtures key={editorEpoch} config={config} onUpdate={updateConfig} onNotice={setNotice} /></div>
+        <div hidden={page !== 'fixtures'}>
+          <Output config={config} runtime={runtime} ready={saveState === 'saved' && backendConnected && runtime !== null} busy={commandBusy} onUpdate={updateConfig} onEnable={enableOutput} onNotice={setNotice} />
+          {runtime?.outputEnabled && <p className="inline-error">Patch editing is locked while USB output is enabled. Black out and disable USB above first.</p>}
+          <fieldset className="patch-controls" disabled={!runtime || runtime.outputEnabled || commandBusy}><Fixtures key={editorEpoch} config={config} onUpdate={updateConfig} onNotice={setNotice} /></fieldset>
+        </div>
         <div hidden={page !== 'moods'}><Moods key={editorEpoch} config={config} runtime={runtime} ready={saveState === 'saved' && backendConnected && runtime !== null} busy={commandBusy} onUpdate={updateConfig} onCommand={simulation} onNotice={setNotice} /></div>
         {page === 'show' && <NotReady title="Show controls" body="There are no performance controls yet. This page cannot activate fixtures or send lighting output." />}
         <Backup saveState={saveState} onImported={applyImportedConfig} onNotice={setNotice} onConnection={setBackendConnected} />
@@ -274,7 +298,7 @@ export function App() {
 
       <footer className="footer">
         <span>StageGlow local setup</span>
-        <span>{runtime?.engineStatus === 'simulation' ? 'Mood simulation' : 'Simulation status unavailable'} | Art-Net disabled</span>
+        <span>{runtime ? (runtime.outputEnabled ? 'ENTTEC USB output' : 'Mood simulation') : 'Output state unknown'} | Art-Net disabled</span>
       </footer>
       {(saveError || notice) && (
         <div className={saveError ? 'toast error' : 'toast'} role="alert">
@@ -554,7 +578,7 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
     </div>
 
     <section className="panel settings-panel">
-      <div className="panel-heading compact"><div><div className="section-kicker">04 / CONNECTION & TEMPO</div><h2>Art-Net settings</h2><p>Settings are stored locally. No lighting packets are sent in this release.</p></div><span className="disabled-chip">OUTPUT DISABLED</span></div>
+      <div className="panel-heading compact"><div><div className="section-kicker">04 / CONNECTION & TEMPO</div><h2>Art-Net settings</h2><p>Stored for future venue output. No Art-Net packets are sent in this release.</p></div><span className="disabled-chip">ART-NET DISABLED</span></div>
       <form onSubmit={applySettings}>
         <div className="form-grid three">
           <label className="field">Node IPv4 address<input inputMode="decimal" placeholder="Blank until configured" value={settings.destinationIp} onChange={(event) => { setSettings({ ...settings, destinationIp: event.target.value }); setSettingsDirty(true) }} /></label>

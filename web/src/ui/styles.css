@@ -210,3 +210,5 @@ input::placeholder { color: #74807d; }
   .settings-footer { align-items: flex-start; flex-direction: column; }
   .editor-footer { align-items: flex-start; flex-direction: column; }
 }
+.patch-controls { border: 0; padding: 0; margin: 0; min-width: 0; }
+.output-panel { margin-bottom: 24px; }
