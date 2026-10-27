@@ -4,15 +4,16 @@ Local, mood-based stage lighting over Art-Net, operated from a touchscreen
 browser and hosted on a Raspberry Pi.
 
 **Current stage: mood generation and ENTTEC DMX USB PRO home output.**
-USB hardware commissioning is still required. Art-Net and the Show page are not
-implemented; this is not yet a show-ready release.
+USB hardware commissioning is still required. A full-screen Show grid is
+available; Art-Net is not implemented and the system still needs rehearsal
+and physical acceptance before live use.
 
 Fixture profiles, groups, loadouts, channel patching, Art-Net destination settings,
 and configuration backups are implemented. The mood editor and server-side
 generator support static lighting, independent palette/intensity drift,
 RGB/white/amber mixing, separate UV, tempo divisions, and smooth mood transitions.
 Explicitly enabled USB output uses the same generated frames as the simulation.
-Art-Net venue output and the performance show page follow in later milestones.
+Art-Net venue output remains deferred until after home testing and adjustments.
 
 ## Run locally
 
@@ -96,6 +97,37 @@ Old schema-1 configurations without output settings default to simulation.
 does not stop lighting; USB disconnection, application crash, or power loss
 cannot guarantee blackout. Test physical loss behavior and keep a hardware means
 of stopping output available. See the [commissioning checklist](deploy/README.md).
+
+## Run a show
+
+1. On **Show**, choose 8-12 mood buttons and assign their moods in order.
+   Choose a dedicated low-light **Pause** mood, or create the supplied starting
+   point (static warm lighting at 10% intensity with UV off). Adjust its settings
+   in Moods for your fixtures and stage. Unassigned buttons are disabled.
+2. Wait for Saved and choose **Enter show mode**. The grid fills the browser
+   viewport; setup headers, navigation, and backups are hidden. **Fullscreen**
+   optionally hides browser chrome where supported.
+3. Use the fixed bottom row: **Blackout**, **Pause**, **Tap tempo**. Mood and
+   Pause buttons crossfade while running. Blackout is immediate and latched;
+   during blackout, mood and Pause buttons select the pending mood only.
+   Use **Release blackout** to restore output, with confirmation for physical USB.
+4. Master brightness stays in the compact top strip. Tap repeatedly to set
+   global BPM; tempo autosaves without locking the performance buttons.
+   Active/pending labels distinguish what is selected from what is playing.
+5. **Exit show** requires confirmation to unlock editing and does not change
+   lighting. Assignments and Pause selection persist in backups, but performance
+   mode, master brightness, selected mood, and USB enablement do not persist
+   across process restart.
+
+Entering Show never enables USB or releases blackout. Enable the interface on
+Fixtures first for real output; otherwise Show controls the simulation. A USB
+fault disables normal performance actions until addressed outside Show.
+Connection loss shows unknown output state and disables mood/tempo controls;
+commands are not queued for replay. Server lighting continues independently of
+the browser. Blackout remains available as a best-effort command.
+
+Use one operator. The Show editing lock prevents accidental local navigation,
+not changes from another browser; multi-operator ownership is not implemented.
 
 ## Raspberry Pi
 

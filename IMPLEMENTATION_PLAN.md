@@ -30,12 +30,22 @@ device timing settings are changed. Protocol and lifecycle tests use fake serial
 devices, not a physical interface. Deployment instructions include USB
 permissions and a home commissioning checklist.
 
-Show remains not ready. There is no Art-Net sender or separate timed
-commissioning-preview session yet. Browser state uses polling rather than
-WebSockets. Operator ownership, sustained Pi 2 operation, physical boot
-verification, and real fixture/controller commissioning remain pending.
-The systemd unit has not been tested on the physical Pi. Art-Net is the next
-software output milestone, after USB home acceptance.
+The Show interface is implemented: persisted 8-12 ordered mood slots, a dedicated
+Pause mood, viewport-filling responsive grid, and a fixed bottom row for
+Blackout, Pause, and Tap Tempo. A compact strip provides master brightness,
+active/pending mood, USB/simulation/fault/connection status, deliberate blackout
+release, optional browser fullscreen, and a confirmed exit to unlock editing.
+Normal mood/Pause changes do not prompt; they never override latched blackout.
+Unassigned slots are disabled. The Pause starter is static warm 10% light with
+UV off and remains editable. Schema-1 backups without a show layout receive
+eight unassigned slots.
+
+Art-Net remains deferred until after the user's USB testing and adjustments.
+There is no separate timed commissioning-preview session yet. Browser state uses
+polling rather than WebSockets. Milestone 6's local performance controls and
+editing lock are complete; multi-operator ownership is still deferred. Sustained
+Pi 2 operation, physical boot verification, and real fixture/controller
+commissioning remain pending. The systemd unit has not been tested on the Pi.
 
 ## Goal and agreed scope
 

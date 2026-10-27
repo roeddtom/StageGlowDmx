@@ -121,6 +121,11 @@ Commission with a representative fixture at low brightness and UV off:
    simulation with a blank port.
 8. Run several moods for a sustained session on the Pi 2 and check smoothness,
    USB errors, temperature, and responsiveness with and without a browser open.
+9. Configure the Show grid and low-light Pause mood. Rehearse the fixed
+   Blackout/Pause/Tap Tempo controls, deliberate blackout release, master level,
+   screen rotation, and reconnects from your actual phone/tablet. Verify the
+   Pause mood is suitably dim on physical fixtures; its default 10% is only
+   a starting point, not calibrated stage brightness.
 
 If a write or open times out, output disarms and cleanup blocks new connections.
 Wait for cleanup before retrying. A stuck driver or failed close can require
