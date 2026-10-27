@@ -3,13 +3,16 @@
 Local, mood-based stage lighting over Art-Net, operated from a touchscreen
 browser and hosted on a Raspberry Pi.
 
-**Current stage: mood simulation. No DMX or Art-Net is transmitted.**
+**Current stage: mood generation and ENTTEC DMX USB PRO home output.**
+USB hardware commissioning is still required. Art-Net and the Show page are not
+implemented; this is not yet a show-ready release.
 
 Fixture profiles, groups, loadouts, channel patching, Art-Net destination settings,
 and configuration backups are implemented. The mood editor and server-side
 generator support static lighting, independent palette/intensity drift,
 RGB/white/amber mixing, separate UV, tempo divisions, and smooth mood transitions.
-Hardware output and the performance show page follow in later milestones.
+Explicitly enabled USB output uses the same generated frames as the simulation.
+Art-Net venue output and the performance show page follow in later milestones.
 
 ## Run locally
 
@@ -60,6 +63,39 @@ The server uses elapsed time rather than browser timers, so reconnecting does
 not restart the mood. Process restarts clear the selected mood and start blacked
 out. Patch changes and configuration imports also latch simulation blackout.
 Schema-1 backups from the configuration-only release load with an empty mood list.
+
+## Test moods through ENTTEC USB
+
+Connect the original **ENTTEC DMX USB PRO** to the computer running the Go service
+and its DMX output to your fixtures. This is server-side serial output, not
+browser WebUSB; ENTTEC Open DMX USB is unsupported.
+
+1. Configure and simulate the same fixture profiles, loadout, and moods first.
+   Verify each fixture manual's channel mode and safe fixed values.
+2. In Fixtures > Lighting output, select ENTTEC DMX USB PRO, refresh serial ports,
+   choose the correct device, and apply settings. Windows uses a port such as
+   `COM3`; on the Pi prefer a stable `/dev/serial/by-id/` path.
+3. Wait for Saved, then explicitly enable USB output. The first frame is blacked
+   out, even if a simulation was running.
+4. In Moods, select a mood, lower master brightness, and confirm **Release USB
+   blackout (real lights)**. Controls and saved mood edits now affect real lights.
+5. Use Blackout at any time, or **Black out & disable USB** before repatching or
+   disconnecting. Faults disarm USB and require an explicit retry after cleanup.
+
+The server sends full frames at 30 Hz independently of browser activity. The
+interface repeats DMX at its own configured refresh rate; the application does
+not modify its persistent timing settings. Check the device's rate when
+commissioning smooth fades. A protocol handshake and successful writes do not
+prove that fixtures received the intended output.
+
+Saved output settings never auto-enable USB after restart. Exports omit the
+machine-local port and reset output mode to simulation; imports do the same.
+Old schema-1 configurations without output settings default to simulation.
+
+**A fault may leave lights on.** USB PRO buffers its last frame. Browser loss
+does not stop lighting; USB disconnection, application crash, or power loss
+cannot guarantee blackout. Test physical loss behavior and keep a hardware means
+of stopping output available. See the [commissioning checklist](deploy/README.md).
 
 ## Raspberry Pi
 

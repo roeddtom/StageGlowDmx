@@ -1,5 +1,5 @@
 [Unit]
-Description=StageGlowDmx local lighting configuration and mood simulation
+Description=StageGlowDmx local lighting and ENTTEC USB output
 Wants=network-online.target
 After=network-online.target
 StartLimitIntervalSec=60

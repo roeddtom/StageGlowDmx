@@ -16,15 +16,26 @@ brightness, and latched simulation blackout. Simulated fixture colours and
 elapsed server time, independent of browser polling cadence. Existing schema-1
 backups without a moods field remain compatible.
 
-Show remains not ready. There is no Art-Net sender, live hardware preview,
-output-enable control, or 30 Hz output transport yet. Simulation can run, but
-hardware output is always disabled. Browser state currently uses polling rather
-than WebSockets. Operator ownership, physical Pi boot verification, and real
-fixture/controller commissioning remain pending. Deployment instructions and
-a systemd unit are provided but have not been tested on the physical Pi.
+ENTTEC DMX USB PRO home output is implemented in software: full-universe
+framing, read-only widget handshake, 30 Hz server-driven output, explicit
+enablement in blackout, physical blackout-release confirmation, master control,
+and bounded I/O with fault disarming and cleanup gating. The Fixtures page
+provides server port selection and diagnostics. Patch/output changes and imports
+are rejected while output is enabled. Exports/imports remove machine-local USB
+settings; old backups default to simulation. Runtime enablement never persists.
 
-ENTTEC DMX USB PRO support is now planned as the first hardware-output milestone
-for home testing. It is not implemented yet; Art-Net remains the venue output.
+Milestone 4a software is complete; its physical acceptance remains pending.
+The original USB PRO API v1.44 (70304) is the protocol reference; no persistent
+device timing settings are changed. Protocol and lifecycle tests use fake serial
+devices, not a physical interface. Deployment instructions include USB
+permissions and a home commissioning checklist.
+
+Show remains not ready. There is no Art-Net sender or separate timed
+commissioning-preview session yet. Browser state uses polling rather than
+WebSockets. Operator ownership, sustained Pi 2 operation, physical boot
+verification, and real fixture/controller commissioning remain pending.
+The systemd unit has not been tested on the physical Pi. Art-Net is the next
+software output milestone, after USB home acceptance.
 
 ## Goal and agreed scope
 
@@ -223,10 +234,11 @@ the Raspberry Pi, and connect its DMX output to the home fixture chain. The
 phone remains a browser controller; this is not browser WebUSB or Android USB
 support. No Art-Net node is needed for this path.
 
-Target the original ENTTEC DMX USB PRO first. Confirm the exact model and its
-official programming documentation before implementation; do not assume the
-Open DMX USB, USB PRO Mk2, or compatible-looking interfaces use identical
-protocols or device setup.
+Target the original ENTTEC DMX USB PRO first. The implementation uses ENTTEC's
+[DMX USB PRO API v1.44](https://cdn.enttec.com/pdf/assets/70304/70304_DMX_USB_PRO_API.pdf).
+Confirm the physical model before enabling output; do not assume the Open DMX
+USB, USB PRO Mk2, or compatible-looking interfaces use identical protocols or
+device setup.
 
 Implement its documented framed USB/serial protocol and DMX output command.
 Include the DMX start code and all 512 channel values; let the PRO hardware
