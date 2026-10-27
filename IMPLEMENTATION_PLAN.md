@@ -33,8 +33,10 @@ permissions and a home commissioning checklist.
 The Show interface is implemented: persisted 8-12 ordered mood slots, a dedicated
 Pause mood, viewport-filling responsive grid, and a fixed bottom row for
 Blackout, Pause, and Tap Tempo. A compact strip provides master brightness,
-active/pending mood, USB/simulation/fault/connection status, deliberate blackout
-release, optional browser fullscreen, and a confirmed exit to unlock editing.
+active/pending mood, USB/simulation/fault/connection status, optional browser
+fullscreen, and a confirmed exit to unlock editing. Show's Blackout button is a
+direct on/off toggle with no separate release control or confirmation dialog;
+restoring output requires a selected mood and a healthy connection.
 Normal mood/Pause changes do not prompt; they never override latched blackout.
 Unassigned slots are disabled. The Pause starter is static warm 10% light with
 UV off and remains editable. Schema-1 backups without a show layout receive
@@ -310,7 +312,8 @@ front lighting and slowly drifting blue/purple back lighting.
 High-contrast, large touch targets for 8-12 mood slots, persistent Blackout and
 Break controls, master brightness, tap tempo/BPM, active/pending mood indication,
 and controller/browser connection status. Avoid confirmations for normal
-performance actions. Make blackout visibly latched and its release deliberate.
+performance actions. Make blackout visibly latched; tapping Blackout again
+restores the pending mood without a separate release control or confirmation.
 
 An edit lock prevents accidental navigation into configuration. It does not
 claim to be authentication. Avoid reliance on hover, tiny sliders, or colour

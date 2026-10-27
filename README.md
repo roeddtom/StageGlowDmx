@@ -110,7 +110,8 @@ of stopping output available. See the [commissioning checklist](deploy/README.md
 3. Use the fixed bottom row: **Blackout**, **Pause**, **Tap tempo**. Mood and
    Pause buttons crossfade while running. Blackout is immediate and latched;
    during blackout, mood and Pause buttons select the pending mood only.
-   Use **Release blackout** to restore output, with confirmation for physical USB.
+   Tap **Blackout** again to restore the pending mood. It is a toggle, with no
+   separate release button or confirmation dialog, including for physical USB.
 4. Master brightness stays in the compact top strip. Tap repeatedly to set
    global BPM; tempo autosaves without locking the performance buttons.
    Active/pending labels distinguish what is selected from what is playing.

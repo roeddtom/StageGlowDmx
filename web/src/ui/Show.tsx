@@ -43,7 +43,7 @@ export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'con
     <section className="panel">
       <h2>Before performing</h2>
       <p>Enable USB deliberately on Fixtures first if you want real lights; entering Show never enables hardware or releases blackout. Simulation remains available without the interface.</p>
-      <p>When running, mood and Pause buttons crossfade immediately. During blackout they select the pending mood only. Use the separate Release blackout control to restore lighting.</p>
+      <p>When running, mood and Pause buttons crossfade immediately. During blackout they select the pending mood only. Tap Blackout again to restore the pending mood, without a confirmation dialog.</p>
       <p className="subtle">Show mode hides configuration and navigation. Leaving requires confirmation and does not stop output. Browser fullscreen is optional. A disconnected browser does not stop the server; output may continue.</p>
     </section>
   </div>
@@ -95,10 +95,6 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
       <div className="show-levels">
         <label>Master <select aria-label="Show master brightness" value={runtime?.master ?? 1} disabled={!canPlay} onChange={(event) => void onCommand({ action: 'master', value: Number(event.target.value) })}>{[0, 0.1, 0.25, 0.5, 0.75, 1].map((value) => <option key={value} value={value}>{Math.round(value * 100)}%</option>)}</select></label>
         <span>{config.bpm} BPM<small className="show-tempo-status">{!ready && runtime ? ' / save unavailable' : runtime && runtime.bpm !== config.bpm ? ' / saving tempo' : ''}</small></span>
-        <button className="button show-release" disabled={!canPlay || !runtime?.blackout || !active} onClick={() => {
-          if (hardware && !window.confirm('Release USB blackout and turn on real fixtures with the pending mood?')) return
-          void onCommand({ action: 'blackout', enabled: false })
-        }}>Release blackout</button>
       </div>
     </header>
     {(message || fullscreenError) && <div className="show-message" role="alert"><span>{message || fullscreenError}</span><button aria-label="Dismiss show message" onClick={() => { onDismiss(); setFullscreenError('') }}>x</button></div>}
@@ -115,7 +111,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
       })}
     </div>
     <div className="show-fixed" aria-label="Fixed performance buttons">
-      <button className={`show-action show-blackout ${runtime?.blackout ? 'is-selected' : ''}`} disabled={busy} aria-pressed={runtime?.blackout ?? false} onClick={() => void onCommand({ action: 'blackout', enabled: true })}><strong>Blackout</strong><span>{!runtime ? 'State unknown' : runtime.blackout ? 'LATCHED' : 'Immediate'}</span></button>
+      <button className={`show-action show-blackout ${runtime?.blackout ? 'is-selected' : ''}`} disabled={busy || Boolean(runtime?.blackout && (!canPlay || !active))} aria-pressed={runtime?.blackout ?? false} onClick={() => void onCommand({ action: 'blackout', enabled: !runtime || !runtime.blackout })}><strong>Blackout</strong><span>{!runtime ? 'State unknown' : runtime.blackout ? active ? 'ON / tap to restore' : 'ON / select a mood' : 'OFF / tap to black out'}</span></button>
       <button className={`show-action show-pause ${pause && runtime?.activeMoodId === pause.id ? 'is-selected' : ''}`} disabled={!canPlay || !pause} aria-pressed={Boolean(pause && runtime?.activeMoodId === pause.id)} onClick={() => { if (pause) void onCommand({ action: 'select', moodId: pause.id }) }}><strong>Pause</strong><span>{pause ? runtime?.activeMoodId === pause.id ? runtime.blackout ? 'PENDING / BLACKOUT' : 'PLAYING' : 'Low light' : 'Not assigned'}</span></button>
       <button className="show-action show-tap" disabled={!runtime || fault} onClick={tap}><strong>Tap tempo</strong><span>{tapHint ? 'Tap again' : `${config.bpm} BPM`}</span></button>
     </div>
