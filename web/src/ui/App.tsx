@@ -5,6 +5,7 @@ import {
 } from '../model'
 import { Moods, type SimulationCommand } from './Moods'
 import { Output } from './Output'
+import { Show, ShowSetup } from './Show'
 
 type Page = 'fixtures' | 'moods' | 'show'
 
@@ -47,6 +48,7 @@ export function App() {
   const [loadError, setLoadError] = useState('')
   const [reload, setReload] = useState(0)
   const [page, setPage] = useState<Page>('fixtures')
+  const [performing, setPerforming] = useState(false)
   const [notice, setNotice] = useState('')
   const [saveError, setSaveError] = useState('')
   const [remoteConflict, setRemoteConflict] = useState(false)
@@ -198,11 +200,11 @@ export function App() {
       } catch {
         if (!cancelled) { setBackendConnected(false); setRuntime(null) }
       }
-      if (!cancelled) timer = window.setTimeout(() => { void poll() }, page === 'moods' ? 150 : 1000)
+      if (!cancelled) timer = window.setTimeout(() => { void poll() }, page === 'moods' || performing ? 150 : 1000)
     }
     void poll()
     return () => { cancelled = true; window.clearTimeout(timer) }
-  }, [loaded, page])
+  }, [loaded, page, performing])
 
   const simulation = async (command: SimulationCommand) => {
     if (commandBusy) return
@@ -252,6 +254,8 @@ export function App() {
     )
   }
 
+  if (performing) return <Show config={config} runtime={runtime} ready={saveState !== 'error' && backendConnected && runtime !== null} busy={commandBusy} onUpdate={updateConfig} onCommand={simulation} onExit={() => setPerforming(false)} message={saveError || notice} onDismiss={() => { setSaveError(''); setNotice('') }} />
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -278,7 +282,6 @@ export function App() {
           <button key={item} className={page === item ? 'nav-item active' : 'nav-item'} onClick={() => setPage(item)}>
             <span className={`nav-mark ${item}`} aria-hidden="true" />
             {item === 'fixtures' ? 'Fixtures' : item === 'moods' ? 'Moods' : 'Show'}
-            {item === 'show' && <span className="soon-tag">NOT READY</span>}
           </button>
         ))}
         <div className="nav-spacer" />
@@ -292,7 +295,7 @@ export function App() {
           <fieldset className="patch-controls" disabled={!runtime || runtime.outputEnabled || commandBusy}><Fixtures key={editorEpoch} config={config} onUpdate={updateConfig} onNotice={setNotice} /></fieldset>
         </div>
         <div hidden={page !== 'moods'}><Moods key={editorEpoch} config={config} runtime={runtime} ready={saveState === 'saved' && backendConnected && runtime !== null} busy={commandBusy} onUpdate={updateConfig} onCommand={simulation} onNotice={setNotice} /></div>
-        {page === 'show' && <NotReady title="Show controls" body="There are no performance controls yet. This page cannot activate fixtures or send lighting output." />}
+        {page === 'show' && <ShowSetup config={config} ready={saveState === 'saved' && backendConnected && runtime !== null} onUpdate={updateConfig} onEnter={() => { setNotice(''); setPerforming(true) }} />}
         <Backup saveState={saveState} onImported={applyImportedConfig} onNotice={setNotice} onConnection={setBackendConnected} />
       </main>
 
@@ -319,15 +322,6 @@ function Brand() {
     <span className="brand-symbol"><i /><i /><i /></span>
     <span>STAGE<span className="brand-light">GLOW</span><small>LIGHTING SETUP</small></span>
   </a>
-}
-
-function NotReady({ title, body }: { title: string; body: string }) {
-  return <section className="panel not-ready">
-    <div className="section-kicker">COMING LATER</div>
-    <h1>{title}</h1>
-    <p>{body}</p>
-    <div className="not-ready-note"><span className="status-dot" /> No commands are available on this page.</div>
-  </section>
 }
 
 function SectionHeading({ kicker, title, description, action }: { kicker: string; title: string; description: string; action?: React.ReactNode }) {
