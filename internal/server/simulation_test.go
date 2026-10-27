@@ -26,6 +26,7 @@ func TestSimulationCommandsAndPersistedMoods(t *testing.T) {
 		ID: "warm", Name: "Warm", BeatsPerChange: 8, Smoothness: 1, CrossfadeSeconds: 2,
 		Groups: []config.MoodGroup{{GroupID: "front", ColorMode: "static", Palette: []string{"#ff0000"}, IntensityMin: 0.5, IntensityMax: 0.5}},
 	}}
+	c.Show.Slots[0], c.Show.PauseMoodID = "warm", "warm"
 	if err := store.Save(c); err != nil {
 		t.Fatal(err)
 	}
@@ -85,8 +86,13 @@ func TestSimulationCommandsAndPersistedMoods(t *testing.T) {
 		t.Fatal("import must latch simulation blackout")
 	}
 	reopened, err := config.Open(dir)
-	if err != nil || len(reopened.Get().Moods) != 1 {
-		t.Fatal("mood was not persisted", err)
+	if err != nil || len(reopened.Get().Moods) != 1 || reopened.Get().Show.Slots[0] != "warm" || reopened.Get().Show.PauseMoodID != "warm" {
+		t.Fatal("mood and show layout were not persisted", err)
+	}
+	var exported config.Config
+	if err := json.Unmarshal(request(h, "GET", "/api/config/export", "").Body.Bytes(), &exported); err != nil ||
+		exported.Show.Slots[0] != "warm" || exported.Show.PauseMoodID != "warm" {
+		t.Fatal("show layout missing from backup", err)
 	}
 	restarted := New(reopened, nil)
 	var fresh engine.State

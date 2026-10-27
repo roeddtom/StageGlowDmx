@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { makeId, makeMood, makeMoodGroup, tapBPM, validateConfig, type Config, type Mood, type MoodGroup, type RuntimeState } from '../model'
+import { makeId, makeMood, makeMoodGroup, removeMood, tapBPM, validateConfig, type Config, type Mood, type MoodGroup, type RuntimeState } from '../model'
 
 export type SimulationCommand =
   | { action: 'select'; moodId: string }
@@ -79,8 +79,8 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
             <button className="text-button" onClick={() => { setDraft(structuredClone(mood)); setError('') }} aria-label={`Edit ${mood.name}`}>Edit</button>
             <button className="text-button" onClick={() => { setDraft({ ...structuredClone(mood), id: makeId(), name: `${mood.name} copy` }); setError('') }} aria-label={`Duplicate ${mood.name}`}>Duplicate</button>
             <button className="text-button danger-text" onClick={() => {
-              if (!window.confirm(`Delete mood "${mood.name}"? Deleting the selected mood blacks out the generated output.`)) return
-              onUpdate({ ...config, moods: moods.filter((item) => item.id !== mood.id) })
+              if (!window.confirm(`Delete mood "${mood.name}"? This clears its Show and Pause assignments. Deleting the selected mood blacks out the generated output.`)) return
+              onUpdate(removeMood(config, mood.id))
               if (draft?.id === mood.id) setDraft(null)
             }} aria-label={`Delete mood ${mood.name}`}>Delete</button>
           </div>

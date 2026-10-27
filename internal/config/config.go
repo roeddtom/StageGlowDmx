@@ -77,6 +77,11 @@ type Mood struct {
 	Groups           []MoodGroup `json:"groups"`
 }
 
+type Show struct {
+	Slots       []string `json:"slots"`
+	PauseMoodID string   `json:"pauseMoodId"`
+}
+
 type Config struct {
 	SchemaVersion   int       `json:"schemaVersion"`
 	Profiles        []Profile `json:"profiles"`
@@ -87,6 +92,7 @@ type Config struct {
 	BPM             float64   `json:"bpm"`
 	Moods           []Mood    `json:"moods"`
 	Output          Output    `json:"output"`
+	Show            Show      `json:"show"`
 }
 
 func Defaults() Config {
@@ -98,6 +104,7 @@ func Defaults() Config {
 		BPM:           120,
 		Moods:         []Mood{},
 		Output:        Output{Mode: "simulation"},
+		Show:          Show{Slots: make([]string, 8)},
 	}
 }
 
@@ -111,7 +118,7 @@ func invalid(format string, args ...any) error {
 
 // Decode accepts one complete configuration, never a partial update.
 func Decode(r io.Reader) (Config, error) {
-	c := Config{Moods: []Mood{}, Output: Output{Mode: "simulation"}}
+	c := Defaults()
 	d := json.NewDecoder(r)
 	var raw json.RawMessage
 	if err := d.Decode(&raw); err != nil {
@@ -171,6 +178,22 @@ func Decode(r io.Reader) (Config, error) {
 		var output map[string]json.RawMessage
 		if err := json.Unmarshal(data, &output); err != nil {
 			return c, err
+		}
+		if data, exists := object["show"]; exists {
+			var show map[string]json.RawMessage
+			if err := json.Unmarshal(data, &show); err != nil {
+				return c, err
+			}
+			if err := required(show, "slots", "pauseMoodId"); err != nil {
+				return c, err
+			}
+			var slots []json.RawMessage
+			_ = json.Unmarshal(show["slots"], &slots)
+			for _, slot := range slots {
+				if bytes.Equal(bytes.TrimSpace(slot), []byte("null")) {
+					return c, invalid("show slots must be mood IDs or empty strings, not null")
+				}
+			}
 		}
 		if err := required(output, "mode", "serialPort"); err != nil {
 			return c, err
@@ -336,6 +359,18 @@ func (c Config) Validate() error {
 	if err := validateMoods(c.Moods, groups); err != nil {
 		return err
 	}
+	if len(c.Show.Slots) < 8 || len(c.Show.Slots) > 12 {
+		return invalid("show.slots must contain 8-12 mood IDs or empty strings")
+	}
+	moodIDs := make(map[string]bool)
+	for _, mood := range c.Moods {
+		moodIDs[mood.ID] = true
+	}
+	for _, id := range append(append([]string{}, c.Show.Slots...), c.Show.PauseMoodID) {
+		if id != "" && !moodIDs[id] {
+			return invalid("show must reference existing moods or empty strings")
+		}
+	}
 	return nil
 }
 
@@ -387,6 +422,7 @@ func finiteRange(v, min, max float64) bool {
 }
 
 func clone(c Config) Config {
+	c.Show.Slots = append([]string{}, c.Show.Slots...)
 	c.Profiles = append([]Profile{}, c.Profiles...)
 	for i := range c.Profiles {
 		c.Profiles[i].Channels = append([]Channel{}, c.Profiles[i].Channels...)

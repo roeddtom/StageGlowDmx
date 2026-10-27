@@ -63,6 +63,18 @@ export type Config = {
   bpm: number
   moods: Mood[]
   output: { mode: 'simulation' | 'enttec' | 'artnet'; serialPort: string }
+  show: ShowLayout
+}
+
+export type ShowLayout = { slots: string[]; pauseMoodId: string }
+export const emptyShow = (): ShowLayout => ({ slots: Array<string>(8).fill(''), pauseMoodId: '' })
+
+export function removeMood(config: Config, moodId: string): Config {
+  const show = config.show ?? emptyShow()
+  return {
+    ...config, moods: config.moods.filter((mood) => mood.id !== moodId),
+    show: { slots: show.slots.map((id) => id === moodId ? '' : id), pauseMoodId: show.pauseMoodId === moodId ? '' : show.pauseMoodId },
+  }
 }
 
 export const emptyConfig = (): Config => ({
@@ -75,6 +87,7 @@ export const emptyConfig = (): Config => ({
   bpm: 120,
   moods: [],
   output: { mode: 'simulation', serialPort: '' },
+  show: emptyShow(),
 })
 
 export function makeMoodGroup(group: Group, evolving = false): MoodGroup {
@@ -160,7 +173,7 @@ export function validateConfig(input: unknown): string[] {
     for (const key of Object.keys(value)) if (![...required, ...optional].includes(key)) errors.push(`${label} contains unsupported field "${key}".`)
     return true
   }
-  checkShape(input, 'Configuration', ['schemaVersion', 'profiles', 'groups', 'loadouts', 'activeLoadoutId', 'artNet', 'bpm'], ['moods', 'output'])
+  checkShape(input, 'Configuration', ['schemaVersion', 'profiles', 'groups', 'loadouts', 'activeLoadoutId', 'artNet', 'bpm'], ['moods', 'output', 'show'])
   const config = input as Partial<Config>
   if (config.schemaVersion !== 1) errors.push('Only configuration schema version 1 is supported.')
   if (!Array.isArray(config.profiles) || !Array.isArray(config.groups) || !Array.isArray(config.loadouts)) {
@@ -314,6 +327,17 @@ export function validateConfig(input: unknown): string[] {
         }
         if (!isFiniteIn(group.uv, 0, 1)) errors.push('UV must be 0-1.')
       }
+    }
+  }
+  if ('show' in input && checkShape(config.show, 'Show layout', ['slots', 'pauseMoodId'])) {
+    const show = config.show
+    const moodIds = new Set(Array.isArray(config.moods) ? config.moods.filter(isRecord).map((mood) => mood.id) : [])
+    if (!Array.isArray(show.slots) || show.slots.length < 8 || show.slots.length > 12 ||
+      show.slots.some((id) => typeof id !== 'string' || (id !== '' && !moodIds.has(id)))) {
+      errors.push('Show needs 8-12 slots, each an existing mood ID or blank.')
+    }
+    if (typeof show.pauseMoodId !== 'string' || (show.pauseMoodId !== '' && !moodIds.has(show.pauseMoodId))) {
+      errors.push('Pause must reference an existing mood or be blank.')
     }
   }
   return [...new Set(errors)]

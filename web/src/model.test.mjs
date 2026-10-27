@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { emptyConfig, makeTemplate, makeMood, tapBPM, validateConfig } from './model.ts'
+import { emptyConfig, makeTemplate, makeMood, removeMood, tapBPM, validateConfig } from './model.ts'
 
 function patchedRig() {
   const config = emptyConfig()
@@ -12,6 +12,41 @@ function patchedRig() {
 }
 
 describe('configuration validation', () => {
+  it('validates show slots and pause references while accepting old backups', () => {
+    const config = patchedRig()
+    const mood = makeMood(config.groups)
+    config.moods = [mood]
+    for (const count of [8, 10, 12]) {
+      config.show = { slots: Array(count).fill(mood.id), pauseMoodId: mood.id }
+      assert.deepEqual(validateConfig(config), [])
+    }
+    for (const show of [null, {}, { slots: [], pauseMoodId: '' },
+      { slots: Array(13).fill(''), pauseMoodId: '' }, { slots: Array(8).fill(null), pauseMoodId: '' },
+      { slots: Array(8).fill('missing'), pauseMoodId: '' }, { slots: Array(8).fill(''), pauseMoodId: 'missing' },
+      { slots: Array(8).fill(''), pauseMoodId: null }, { slots: Array(8).fill(''), pauseMoodId: '', extra: 1 }]) {
+      config.show = show
+      assert.ok(validateConfig(config).length > 0)
+    }
+    delete config.show
+    assert.deepEqual(validateConfig(config), [])
+  })
+
+  it('clears every show and pause assignment when deleting a mood without mutating config', () => {
+    const config = patchedRig()
+    const first = makeMood(config.groups), second = makeMood(config.groups)
+    config.moods = [first, second]
+    config.show.slots[0] = first.id
+    config.show.slots[1] = second.id
+    config.show.slots[2] = first.id
+    config.show.pauseMoodId = first.id
+    const next = removeMood(config, first.id)
+    assert.deepEqual(validateConfig(next), [])
+    assert.deepEqual(next.show.slots.slice(0, 3), ['', second.id, ''])
+    assert.equal(next.show.pauseMoodId, '')
+    assert.equal(config.show.pauseMoodId, first.id)
+    assert.equal(config.moods.length, 2)
+  })
+
   it('accepts legacy output defaults and only safe machine-local serial paths', () => {
     const config = patchedRig()
     delete config.output
