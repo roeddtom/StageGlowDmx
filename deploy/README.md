@@ -1,7 +1,8 @@
 # Raspberry Pi deployment
 
-This is a configuration-only development release. It does not emit DMX or
-Art-Net. Completing this installation does not make the system show-ready.
+This is a configuration and mood-simulation development release. It does not
+transmit DMX or Art-Net. Completing this installation does not make the system
+show-ready.
 
 ## Prepare the appliance
 
@@ -52,7 +53,7 @@ the writable state directory `/var/lib/stageglow`; the application directory
 remains read-only to the service.
 
 Open `http://<pi-address>:8080` from a phone or tablet on the same router. The
-page must clearly report that lighting output is not implemented. Verify it
+page must clearly report that simulation does not enable Art-Net output. Verify it
 works after reboot and without the router's internet uplink.
 
 For diagnosis:
@@ -63,7 +64,7 @@ curl http://localhost:8080/api/health
 ```
 
 If a host firewall is enabled, allow TCP 8080 only from the trusted show subnet.
-Art-Net UDP firewall rules are not needed for this configuration-only release.
+Art-Net UDP firewall rules are not needed for this simulation-only release.
 
 ## Backup, restore, and update
 

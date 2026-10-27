@@ -8,11 +8,20 @@ atomic local persistence with backups, and import/export. Host and Linux ARMv7
 builds are available through the Windows build script. Phone/tablet browser
 flows and process-restart persistence have been exercised locally.
 
-The UI deliberately labels Moods and Show as not ready. There is no lighting
-engine, live preview, Art-Net sender, or output-enable control yet. Runtime state
-is always blacked out. Operator ownership, physical Pi boot verification, and
-real fixture/controller commissioning remain pending. Deployment instructions
-and a systemd unit are provided but have not been tested on the physical Pi.
+The mood editor and server-side simulation engine are now implemented, including
+static and independently drifting palette/intensity behavior, global BPM/tap
+tempo, per-mood timing, approximate RGBWA mixing, separate UV, crossfades, master
+brightness, and latched simulation blackout. Simulated fixture colours and
+512-channel frames are visible on the Moods page. Generation is evaluated from
+elapsed server time, independent of browser polling cadence. Existing schema-1
+backups without a moods field remain compatible.
+
+Show remains not ready. There is no Art-Net sender, live hardware preview,
+output-enable control, or 30 Hz output transport yet. Simulation can run, but
+hardware output is always disabled. Browser state currently uses polling rather
+than WebSockets. Operator ownership, physical Pi boot verification, and real
+fixture/controller commissioning remain pending. Deployment instructions and
+a systemd unit are provided but have not been tested on the physical Pi.
 
 ## Goal and agreed scope
 
