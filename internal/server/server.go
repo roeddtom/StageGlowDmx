@@ -155,7 +155,8 @@ func NewWithOutput(store *config.Store, frontend http.Handler, controller *outpu
 			}
 			if r.Method == http.MethodGet {
 				if r.URL.Path == "/api/config/export" {
-					w.Header().Set("Content-Disposition", `attachment; filename="stageglow-config.json"`)
+					filename := "stageglow-config-" + time.Now().UTC().Format("2006-01-02_15-04-05Z") + ".json"
+					w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 					c := store.Get()
 					c.Output = config.Output{Mode: "simulation"}
 					writeJSON(w, http.StatusOK, c)

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"mime"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"stageglowdmx/internal/config"
 )
@@ -62,9 +64,16 @@ func TestConfigurationHTTPRoundTrip(t *testing.T) {
 	if saved.Code != http.StatusOK {
 		t.Fatal(saved.Code, saved.Body.String())
 	}
+	beforeExport := time.Now().UTC().Truncate(time.Second)
 	exported := request(h, http.MethodGet, "/api/config/export", "")
-	if exported.Header().Get("Content-Disposition") != `attachment; filename="stageglow-config.json"` {
-		t.Fatal("export must be downloadable")
+	afterExport := time.Now().UTC()
+	disposition, parameters, err := mime.ParseMediaType(exported.Header().Get("Content-Disposition"))
+	if err != nil || disposition != "attachment" {
+		t.Fatal("export must be downloadable", err)
+	}
+	stamp, err := time.Parse("stageglow-config-2006-01-02_15-04-05Z.json", parameters["filename"])
+	if err != nil || stamp.Before(beforeExport) || stamp.After(afterExport) {
+		t.Fatal("export filename must contain current UTC date and time", parameters["filename"], err)
 	}
 	c.BPM = 160
 	if w := request(h, http.MethodPut, "/api/config", payload(t, c)); w.Code != http.StatusOK {
