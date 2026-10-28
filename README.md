@@ -144,5 +144,7 @@ runtime and no internet connection to serve the application.
 
 ## Plan
 
+For a code-oriented introduction, see [program flow and Go fundamentals](PROGRAM_FLOW.md).
+
 See [the implementation plan](IMPLEMENTATION_PLAN.md) for the agreed first-release
 scope, architecture, safety behavior, and delivery milestones.
