@@ -12,6 +12,29 @@ function patchedRig() {
 }
 
 describe('configuration validation', () => {
+  it('accepts legacy atmospheres and validates static base moods and Pause type', () => {
+    const config = patchedRig()
+    const mood = makeMood(config.groups)
+    delete mood.type
+    config.moods = [mood]
+    assert.deepEqual(validateConfig(config), [])
+    mood.type = 'base'
+    config.show.slots[0] = mood.id
+    assert.deepEqual(validateConfig(config), [])
+    for (const edit of [
+      (c) => { c.moods[0].type = 'unknown' },
+      (c) => { c.moods[0].type = null },
+      (c) => { c.moods[0].groups[0].colorMode = 'palette' },
+      (c) => { c.moods[0].groups[0].palette.push('#ffffff') },
+      (c) => { c.moods[0].groups[0].intensityMax = 1 },
+      (c) => { c.show.pauseMoodId = c.moods[0].id },
+    ]) {
+      const next = structuredClone(config)
+      edit(next)
+      assert.ok(validateConfig(next).length > 0)
+    }
+  })
+
   it('validates show slots and pause references while accepting old backups', () => {
     const config = patchedRig()
     const mood = makeMood(config.groups)

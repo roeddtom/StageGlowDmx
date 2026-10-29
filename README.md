@@ -48,7 +48,8 @@ Frontend tests use Node's built-in test runner.
 2. Open Moods and create a starter or a new mood. The starter keeps groups named
    Front steady and gives other groups a blue/purple palette. Edit colours,
    intensity bounds, UV, beats per change, smoothness, and crossfade duration.
-   Equal intensity bounds hold brightness steady; excluded groups stay dark.
+   Equal intensity bounds hold brightness steady; excluded groups use the
+   selected Base, or stay dark without one.
    Intensity, smoothness, and crossfade have sliders with precise numeric inputs.
    Intensity is shown as a percentage; the **?** buttons explain each control.
 3. Apply the mood and wait for Saved. Select it in the mood list, then explicitly
@@ -66,6 +67,37 @@ The server uses elapsed time rather than browser timers, so reconnecting does
 not restart the mood. Process restarts clear the selected mood and start blacked
 out. Patch changes and configuration imports also latch simulation blackout.
 Schema-1 backups from the configuration-only release load with an empty mood list.
+
+### Base and Atmosphere lighting
+
+Each mood has a **Mood type**: Atmosphere (the default, including all older
+backups) or Base. One of each can be selected independently.
+
+- **Base** provides static fallback lighting: one colour and fixed intensity per
+  included group. Create looks such as "Band front" and "Announcer", including
+  only their relevant groups.
+- **Atmosphere** controls its included groups, overriding the Base rather than
+  adding brightness. Exclude Front from atmospheric moods to keep front lighting
+  unchanged. Explicitly including Front at 0% makes it dark, even with a Base.
+- Switching either layer crossfades without restarting the other layer's timing.
+  **No base** fades out the base using its current crossfade duration and leaves
+  the Atmosphere running. Uncovered groups become dark.
+
+Both selections have independent selected indicators. In Show, Base buttons use
+a **BASE** label and dashed border; they occupy any ordinary grid position you
+assign. The compact top strip includes **No base**.
+
+Pause must be an Atmosphere. It leaves the Base selected, but its included groups
+still override the Base: exclude Front from Pause to preserve Base front lighting.
+The supplied Pause starter includes every group, so adjust its group assignments
+when using it with a Base.
+
+Blackout overrides both layers; selections made while blacked out remain pending.
+Releasing blackout fades in their combination over the longer selected
+crossfade duration. Master applies to the combined output once. Base-only
+lighting works without selecting an Atmosphere. Neither selection persists after
+restart. Deleting a selected mood or changing its type clears that layer and
+latches blackout; changing a Pause mood to Base clears its Pause assignment.
 
 ## Test moods through ENTTEC USB
 
@@ -119,7 +151,7 @@ of stopping output available. See the [commissioning checklist](deploy/README.md
    Active/pending labels distinguish what is selected from what is playing.
 5. **Exit show** requires confirmation to unlock editing and does not change
    lighting. Assignments and Pause selection persist in backups, but performance
-   mode, master brightness, selected mood, and USB enablement do not persist
+   mode, master brightness, selected Base/Atmosphere, and USB enablement do not persist
    across process restart.
 
 Entering Show never enables USB or releases blackout. Enable the interface on

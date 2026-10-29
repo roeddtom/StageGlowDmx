@@ -2,6 +2,20 @@
 
 ## Implementation status (2026-10-27)
 
+Base/Atmosphere layering is implemented: mood type is explicit, with missing
+types retaining Atmosphere behavior. One static Base and one Atmosphere are
+selected independently; Atmosphere overrides its included groups and Base fills
+unassigned groups. Each layer has independent crossfades; Base changes do not
+restart Atmosphere timing. No base fades out fallback lighting. Blackout covers
+both layers, and release fades in the combination using the longer selected
+crossfade. Runtime reports both selections and never persists them.
+
+Base buttons can occupy any Show slot and have a BASE label and dashed border.
+The editor restricts Base groups to one static colour and fixed intensity.
+Pause remains an Atmosphere and retains Base selection, with fallback only for
+groups excluded from Pause. Existing Pause starters include every group and
+should be edited accordingly. There is no arbitrary multilayer/additive mixing.
+
 The first configuration slice is implemented: a Go HTTP service with bundled
 React UI, validated fixture profiles/groups/loadouts, channel conflict checks,
 atomic local persistence with backups, and import/export. Host and Linux ARMv7

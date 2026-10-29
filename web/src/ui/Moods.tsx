@@ -4,6 +4,7 @@ import { MoodSlider } from './MoodSlider'
 
 export type SimulationCommand =
   | { action: 'select'; moodId: string }
+  | { action: 'clear-base' }
   | { action: 'blackout'; enabled: boolean }
   | { action: 'master'; value: number }
 
@@ -25,6 +26,8 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
   const taps = useRef<number[]>([])
   const moods = config.moods ?? []
   const active = moods.find((mood) => mood.id === runtime?.activeMoodId)
+  const activeBase = moods.find((mood) => mood.id === runtime?.activeBaseMoodId)
+  const baseDraft = draft?.type === 'base'
   const hardware = runtime?.outputEnabled === true
   const loadout = config.loadouts.find((item) => item.id === config.activeLoadoutId)
   const unpatchedGroups = active?.groups.filter((group) => !loadout?.fixtures.some((fixture) => fixture.groupId === group.groupId))
@@ -37,6 +40,10 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
       ...config,
       moods: moods.some((mood) => mood.id === draft.id)
         ? moods.map((mood) => mood.id === draft.id ? draft : mood) : [...moods, draft],
+    }
+    if (draft.type === 'base' && next.show?.pauseMoodId === draft.id) {
+      if (!window.confirm('This mood is assigned to Pause. Changing it to Base will clear the Pause assignment. Continue?')) return
+      next.show = { ...next.show, pauseMoodId: '' }
     }
     const errors = validateConfig(next)
     if (errors.length) { setError(errors[0]); return }
@@ -68,19 +75,19 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
     </div>
 
     <section className="panel">
-      <div className="panel-heading"><div><div className="section-kicker">SAVED BEHAVIORS</div><h2>Your moods</h2><p>Selecting a mood never releases blackout. When already running, mood selection and saved edits affect output immediately.</p></div></div>
+      <div className="panel-heading"><div><div className="section-kicker">SAVED BEHAVIORS</div><h2>Your moods</h2><p>Choose one static Base and one Atmosphere. Atmosphere overrides its included groups; excluded groups use the Base, or stay dark without one. Selecting either never releases blackout.</p></div></div>
       <div className="profile-grid">
         {moods.length === 0 && <p className="empty-state">No moods yet. Create a starter mood after defining fixture groups.</p>}
-        {moods.map((mood) => <article className={`profile-card ${active?.id === mood.id ? 'selected-mood' : ''}`} key={mood.id}>
-          <div className="card-title-row"><h3>{mood.name}</h3>{active?.id === mood.id && <span className="profile-tag">SELECTED</span>}</div>
-          <p className="subtle">Every {mood.beatsPerChange} beats | {mood.crossfadeSeconds}s crossfade | {mood.groups.length} groups</p>
+        {moods.map((mood) => <article className={`profile-card ${active?.id === mood.id || activeBase?.id === mood.id ? 'selected-mood' : ''}`} key={mood.id}>
+          <div className="card-title-row"><h3>{mood.name}</h3><span className="profile-tag">{mood.type === 'base' ? 'BASE' : 'ATMOSPHERE'}{active?.id === mood.id || activeBase?.id === mood.id ? ' / SELECTED' : ''}</span></div>
+          <p className="subtle">{mood.type === 'base' ? 'Static lighting' : `Every ${mood.beatsPerChange} beats`} | {mood.crossfadeSeconds}s crossfade | {mood.groups.length} groups</p>
           <div className="palette-swatches" aria-label={`${mood.name} palette`}>{mood.groups.flatMap((group) => group.palette.map((color, i) => <span key={`${group.groupId}-${i}`} style={{ backgroundColor: color }} title={color} />))}</div>
           <div className="button-row">
             <button className="button small secondary" disabled={!ready || busy} onClick={() => void onCommand({ action: 'select', moodId: mood.id })}>Select {mood.name}</button>
             <button className="text-button" onClick={() => { setDraft(structuredClone(mood)); setError('') }} aria-label={`Edit ${mood.name}`}>Edit</button>
             <button className="text-button" onClick={() => { setDraft({ ...structuredClone(mood), id: makeId(), name: `${mood.name} copy` }); setError('') }} aria-label={`Duplicate ${mood.name}`}>Duplicate</button>
             <button className="text-button danger-text" onClick={() => {
-              if (!window.confirm(`Delete mood "${mood.name}"? This clears its Show and Pause assignments. Deleting the selected mood blacks out the generated output.`)) return
+              if (!window.confirm(`Delete mood "${mood.name}"? This clears its Show and Pause assignments. Deleting a selected Base or Atmosphere blacks out the generated output.`)) return
               onUpdate(removeMood(config, mood.id))
               if (draft?.id === mood.id) setDraft(null)
             }} aria-label={`Delete mood ${mood.name}`}>Delete</button>
@@ -93,11 +100,17 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
       <div className="editor-title"><div><div className="section-kicker">MOOD EDITOR</div><h2>{draft.name || 'Untitled mood'}</h2></div><button className="text-button" onClick={() => setDraft(null)}>Cancel mood edits</button></div>
       <div className="form-grid two">
         <label className="field">Mood name<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
-        <label className="field">Change every (beats)<input type="number" min="0.25" max="128" step="0.25" value={draft.beatsPerChange} onChange={(event) => setDraft({ ...draft, beatsPerChange: Number(event.target.value) })} /></label>
-        <MoodSlider label="Smoothness" value={draft.smoothness} min={0.05} max={1} step={0.05} endpoints={['Glide then hold', 'Continuous glide']} help="Controls how much of each change interval is spent gliding to the next colour and intensity target. At 1, the glide lasts the whole interval. Lower values reach the target sooner, then hold. This does not change the interval's tempo." onChange={(smoothness) => setDraft({ ...draft, smoothness })} />
+        <label className="field">Mood type<select value={draft.type ?? 'atmosphere'} onChange={(event) => {
+          const type = event.target.value as 'base' | 'atmosphere'
+          if (type === 'base' && draft.groups.some((group) => group.colorMode !== 'static' || group.palette.length !== 1 || group.intensityMin !== group.intensityMax) &&
+            !window.confirm('Convert to static Base lighting? Each group will keep its first colour and minimum intensity as a fixed level.')) return
+          setDraft({ ...draft, type, groups: type === 'base' ? draft.groups.map((group) => ({ ...group, colorMode: 'static', palette: group.palette.slice(0, 1), intensityMax: group.intensityMin })) : draft.groups })
+        }}><option value="atmosphere">Atmosphere</option><option value="base">Base (static fallback)</option></select></label>
+        {!baseDraft && <label className="field">Change every (beats)<input type="number" min="0.25" max="128" step="0.25" value={draft.beatsPerChange} onChange={(event) => setDraft({ ...draft, beatsPerChange: Number(event.target.value) })} /></label>}
+        {!baseDraft && <MoodSlider label="Smoothness" value={draft.smoothness} min={0.05} max={1} step={0.05} endpoints={['Glide then hold', 'Continuous glide']} help="Controls how much of each change interval is spent gliding to the next colour and intensity target. At 1, the glide lasts the whole interval. Lower values reach the target sooner, then hold. This does not change the interval's tempo." onChange={(smoothness) => setDraft({ ...draft, smoothness })} />}
         <MoodSlider label="Crossfade" value={draft.crossfadeSeconds} min={0} max={30} step={0.5} unit="s" help="How many seconds it takes to transition into this mood, including when restoring it from blackout. Zero switches immediately. Blackout itself is always immediate." onChange={(crossfadeSeconds) => setDraft({ ...draft, crossfadeSeconds })} />
       </div>
-      <p className="subtle">Smoothness 1 glides for the whole interval; lower values glide then hold. Equal intensity bounds keep brightness fixed. UV defaults to off.</p>
+      <p className="subtle">{baseDraft ? 'Base lighting is static. Include only the groups you want as fallback; an Atmosphere explicitly including a group overrides it, even at 0% intensity.' : 'Smoothness 1 glides for the whole interval. Equal intensity bounds keep brightness fixed. Exclude groups such as Front to preserve their Base lighting.'} UV defaults to off.</p>
       {config.groups.length === 0 && <p className="empty-state">Define groups on the Fixtures page first.</p>}
       {config.groups.map((group) => {
         const settings = draft.groups.find((item) => item.groupId === group.id)
@@ -106,20 +119,20 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
           <label className="check-label"><input type="checkbox" checked={Boolean(settings)} onChange={(event) => setDraft({
             ...draft, groups: event.target.checked ? [...draft.groups, makeMoodGroup(group)] : draft.groups.filter((item) => item.groupId !== group.id),
           })} /> Include {group.name}</label>
-          {!settings && <p className="subtle">Unassigned fixtures stay dark in this mood.</p>}
+          {!settings && <p className="subtle">{baseDraft ? 'No Base lighting for this group.' : 'This group uses the selected Base, or stays dark if the Base does not include it.'}</p>}
           {settings && <>
             <div className="form-grid two">
-              <label className="field">Colour mode - {group.name}<select value={settings.colorMode} onChange={(event) => editGroup(group.id, { colorMode: event.target.value as MoodGroup['colorMode'] })}><option value="static">Static (first colour)</option><option value="palette">Independent palette drift</option></select></label>
+              {!baseDraft && <label className="field">Colour mode - {group.name}<select value={settings.colorMode} onChange={(event) => editGroup(group.id, { colorMode: event.target.value as MoodGroup['colorMode'] })}><option value="static">Static (first colour)</option><option value="palette">Independent palette drift</option></select></label>}
               <label className="field">UV - {group.name} (0-1)<input type="number" min="0" max="1" step="0.01" value={settings.uv} onChange={(event) => editGroup(group.id, { uv: Number(event.target.value) })} /></label>
-              <MoodSlider label={`Minimum intensity - ${group.name}`} value={settings.intensityMin} min={0} max={100} step={1} scale={100} unit="%" help="The dimmest target for this group, before master brightness. Each fixture gently varies between minimum and maximum. Set both to the same percentage for steady brightness. Minimum must not exceed maximum." onChange={(intensityMin) => editGroup(group.id, { intensityMin })} />
-              <MoodSlider label={`Maximum intensity - ${group.name}`} value={settings.intensityMax} min={0} max={100} step={1} scale={100} unit="%" help="The brightest target for this group, before master brightness. Keep this at or above minimum. Equal minimum and maximum values hold brightness steady; 0% is dark and 100% is full intensity." onChange={(intensityMax) => editGroup(group.id, { intensityMax })} />
+              <MoodSlider label={`${baseDraft ? 'Intensity' : 'Minimum intensity'} - ${group.name}`} value={settings.intensityMin} min={0} max={100} step={1} scale={100} unit="%" help={baseDraft ? 'Fixed brightness for this group before master brightness. It remains steady unless an Atmosphere overrides this group.' : 'The dimmest target for this group, before master brightness. Each fixture gently varies between minimum and maximum. Set both to the same percentage for steady brightness. Minimum must not exceed maximum.'} onChange={(intensityMin) => editGroup(group.id, baseDraft ? { intensityMin, intensityMax: intensityMin } : { intensityMin })} />
+              {!baseDraft && <MoodSlider label={`Maximum intensity - ${group.name}`} value={settings.intensityMax} min={0} max={100} step={1} scale={100} unit="%" help="The brightest target for this group, before master brightness. Keep this at or above minimum. Equal minimum and maximum values hold brightness steady; 0% is dark and 100% is full intensity." onChange={(intensityMax) => editGroup(group.id, { intensityMax })} />}
             </div>
             <div className="palette-editor">
               {settings.palette.map((color, index) => <div className="palette-stop" key={index}>
                 <label className="field">Colour {index + 1} - {group.name}<input type="color" value={color} onChange={(event) => editGroup(group.id, { palette: settings.palette.map((item, i) => i === index ? event.target.value : item) })} /></label>
                 <button className="text-button danger-text" disabled={settings.palette.length <= 1} aria-label={`Remove colour ${index + 1} from ${group.name}`} onClick={() => editGroup(group.id, { palette: settings.palette.filter((_, i) => i !== index) })}>Remove</button>
               </div>)}
-              <button className="button small" disabled={settings.palette.length >= 32} onClick={() => editGroup(group.id, { palette: [...settings.palette, '#1644ff'] })} aria-label={`Add colour to ${group.name}`}>Add colour</button>
+              {!baseDraft && <button className="button small" disabled={settings.palette.length >= 32} onClick={() => editGroup(group.id, { palette: [...settings.palette, '#1644ff'] })} aria-label={`Add colour to ${group.name}`}>Add colour</button>}
             </div>
           </>}
         </fieldset>
@@ -130,10 +143,11 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
 
     <section className="panel simulation-panel">
       <div className="panel-heading"><div><div className="section-kicker">{hardware ? 'PHYSICAL USB OUTPUT / NO ART-NET' : 'SOFTWARE PREVIEW / NO ART-NET'}</div><h2>{hardware ? 'USB mood control' : 'Mood simulation'}</h2><p>The server clock keeps advancing between browser visits. Selecting a mood while running crossfades smoothly.</p></div><span className="disabled-chip">{!runtime ? 'OUTPUT UNKNOWN' : hardware ? 'USB ENABLED' : 'USB DISABLED'}</span></div>
-      <p>Selected: <strong>{active?.name ?? 'None'}</strong> | {runtime ? (runtime.blackout ? 'Generated blackout latched' : 'Mood running') : 'Output state unknown; lights may still be running'}</p>
+      <p>Atmosphere: <strong>{active?.name ?? 'None'}</strong> | Base: <strong>{activeBase?.name ?? 'None'}</strong> | {runtime ? (runtime.blackout ? 'Generated blackout latched' : 'Mood running') : 'Output state unknown; lights may still be running'}</p>
       <div className="simulation-controls">
         <button className="button danger-button" disabled={busy} onClick={() => void onCommand({ action: 'blackout', enabled: true })}>{hardware ? 'Blackout USB output' : 'Blackout simulation'}</button>
-        <button className="button primary" disabled={!ready || busy || !active || !runtime?.blackout} onClick={() => {
+        <button className="button" disabled={!ready || busy || !activeBase} onClick={() => void onCommand({ action: 'clear-base' })}>No base</button>
+        <button className="button primary" disabled={!ready || busy || (!active && !activeBase) || !runtime?.blackout} onClick={() => {
           if (hardware && !window.confirm('Release physical USB blackout and light real fixtures with the selected mood? Check master brightness and clear the stage first.')) return
           void onCommand({ action: 'blackout', enabled: false })
         }}>{hardware ? 'Release USB blackout (real lights)' : 'Start / restore simulation'}</button>

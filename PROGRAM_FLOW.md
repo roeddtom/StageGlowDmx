@@ -164,7 +164,7 @@ These are deliberately different:
 
 | Persistent configuration | In-memory runtime state |
 |---|---|
-| Profiles, groups, loadouts, DMX addresses | Selected/pending mood |
+| Profiles, groups, loadouts, DMX addresses | Selected/pending Base and Atmosphere |
 | Mood palettes, intensity, smoothness, crossfade | Blackout state |
 | BPM and Show assignments | Master brightness |
 | Output mode and local serial-port name | USB enabled state, errors, frames sent |
@@ -284,11 +284,16 @@ Here `nil` means absent or JSON null, and both are rejected where a boolean is
 required. `*command.Enabled` reads the supplied value after a nil check.
 `omitempty` affects JSON encoding; it does not enforce required request fields.
 
-Selecting a mood captures the current generated light values as the start of
-the next crossfade. It **does not release blackout**.
+Selecting a mood updates the layer matching its `type`: `base` or `atmosphere`.
+Missing types in older configurations mean atmosphere. The other layer's
+selection and time anchor do not change. The selected layer captures its current
+values as the start of its next crossfade. It **does not release blackout**.
 
 Pause is not a separate engine mode: its fixed button selects the configured
-Pause mood through this same path.
+Pause atmosphere through this same path, retaining the selected Base.
+`{"action":"clear-base"}` fades out the base without selecting another atmosphere.
+State responses expose `activeMoodId` for atmosphere and `activeBaseMoodId` for
+base. Both start empty after process restart.
 
 ### Blackout is a separate command
 
@@ -310,7 +315,8 @@ to write a frame. It uses the same lock as scheduled writes, so an older normal
 frame cannot race past the blackout write.
 
 While blackout is on, mood buttons still choose the pending mood. Tapping the
-Blackout toggle again restores that mood using its crossfade duration.
+Blackout toggle again restores the combination using the longer crossfade of
+the selected layers.
 
 ## 6. How a mood becomes DMX values
 
@@ -323,7 +329,8 @@ Current time
   -> position within this mood's change interval
   -> deterministic colour/intensity targets for each fixture
   -> smooth interpolation within the interval
-  -> crossfade from the previous lighting state
+  -> independent crossfade for each layer
+  -> Atmosphere-over-Base composition by assigned group
   -> profile-specific channel mapping + master + blackout
   -> 512-channel DMX universe and browser preview values
 ```
@@ -350,10 +357,10 @@ duration calculations; the engine also guards against its clock moving backward.
 
 ### Smoothness and crossfade are different
 
-For evolving moods, `lights` calculates the interval number and its blend:
+For evolving moods, `layerLights` calculates the interval number and its blend:
 
 ```go
-progress := math.Max(0, e.beats-e.start) / mood.BeatsPerChange
+progress := math.Max(0, e.beats-layer.start) / mood.BeatsPerChange
 segment := uint64(math.Floor(progress))
 blend := glide(progress-math.Floor(progress), mood.Smoothness)
 ```
@@ -374,6 +381,29 @@ The `random` helper hashes the seed, mood/fixture identity, interval number, and
 stream number. It produces repeatable targets without consuming a sequential
 random-number stream on every sample. Colour and intensity use separate streams.
 Extra browser polls do not change the targets.
+
+### Combining the layers
+
+`moodLayer` holds a selection, time anchor, and crossfade state. The engine has
+one for Base and one for Atmosphere. `layerLights` evaluates them separately.
+Base configuration restricts its groups to a single static colour and fixed
+intensity, so it does not drift.
+
+Each internal `light` also has a `coverage` value: 1 for an explicitly assigned
+group, 0 for an absent group, with intermediate values during a crossfade.
+`lights` composites premultiplied layer values:
+
+```go
+value.RGB[i] = (value.RGB[i] + fallback.RGB[i]*(1-value.coverage)) * restore
+```
+
+Here `value` is Atmosphere and `fallback` is Base. Fully covered groups use
+Atmosphere only; uncovered groups use Base. An explicitly dark group still has
+coverage 1, so it suppresses the Base. Crossfading coverage allows a group to
+transition smoothly back to Base rather than jumping when assignments change.
+
+`restore` is the fade-in multiplier after blackout, applied to the combined
+colour, intensity, and UV once. Blackout itself is enforced by channel rendering.
 
 ### Mapping fixture values to channels
 

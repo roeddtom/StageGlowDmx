@@ -31,6 +31,7 @@ export type MoodGroup = {
 export type Mood = {
   id: string
   name: string
+  type?: 'atmosphere' | 'base'
   beatsPerChange: number
   smoothness: number
   crossfadeSeconds: number
@@ -41,6 +42,7 @@ export type RuntimeState = {
   outputEnabled: boolean
   engineStatus: string
   activeMoodId: string
+  activeBaseMoodId: string
   bpm: number
   master: number
   output: {
@@ -100,7 +102,7 @@ export function makeMoodGroup(group: Group, evolving = false): MoodGroup {
 
 export function makeMood(groups: Group[], starter = false): Mood {
   return {
-    id: makeId(), name: starter ? 'Warm stage' : 'New mood',
+    id: makeId(), name: starter ? 'Warm stage' : 'New mood', type: 'atmosphere',
     beatsPerChange: 8, smoothness: 1, crossfadeSeconds: 3,
     groups: groups.map((group) => makeMoodGroup(group, starter && !/front/i.test(group.name))),
   }
@@ -304,8 +306,9 @@ export function validateConfig(input: unknown): string[] {
   if (Array.isArray(config.moods)) {
     uniqueIds(config.moods.filter(isRecord) as Mood[], 'Mood')
     for (const rawMood of config.moods) {
-      if (!checkShape(rawMood, 'Mood', ['id', 'name', 'beatsPerChange', 'smoothness', 'crossfadeSeconds', 'groups'])) continue
+      if (!checkShape(rawMood, 'Mood', ['id', 'name', 'beatsPerChange', 'smoothness', 'crossfadeSeconds', 'groups'], ['type'])) continue
       const mood = rawMood as Mood
+      if ('type' in mood && mood.type !== 'atmosphere' && mood.type !== 'base') errors.push('Mood type must be atmosphere or base.')
       if (!isText(mood.name)) errors.push('Every mood needs a name.')
       if (!isFiniteIn(mood.beatsPerChange, 0.25, 128)) errors.push('Beats per change must be 0.25-128.')
       if (!isFiniteIn(mood.smoothness, 0.05, 1)) errors.push('Smoothness must be 0.05-1.')
@@ -326,6 +329,9 @@ export function validateConfig(input: unknown): string[] {
           errors.push('Intensity must be an ordered range from 0 to 1.')
         }
         if (!isFiniteIn(group.uv, 0, 1)) errors.push('UV must be 0-1.')
+        if (mood.type === 'base' && (group.colorMode !== 'static' || !Array.isArray(group.palette) || group.palette.length !== 1 || group.intensityMin !== group.intensityMax)) {
+          errors.push('Base moods need one static colour and fixed intensity per group.')
+        }
       }
     }
   }
@@ -339,6 +345,7 @@ export function validateConfig(input: unknown): string[] {
     if (typeof show.pauseMoodId !== 'string' || (show.pauseMoodId !== '' && !moodIds.has(show.pauseMoodId))) {
       errors.push('Pause must reference an existing mood or be blank.')
     }
+    if (Array.isArray(config.moods) && config.moods.some((mood) => isRecord(mood) && mood.id === show.pauseMoodId && mood.type === 'base')) errors.push('Pause must use an atmosphere mood.')
   }
   return [...new Set(errors)]
 }
