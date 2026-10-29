@@ -71,11 +71,15 @@ type MoodGroup struct {
 type Mood struct {
 	ID               string      `json:"id"`
 	Name             string      `json:"name"`
+	Type             string      `json:"type,omitempty"`
 	BeatsPerChange   float64     `json:"beatsPerChange"`
 	Smoothness       float64     `json:"smoothness"`
 	CrossfadeSeconds float64     `json:"crossfadeSeconds"`
 	Groups           []MoodGroup `json:"groups"`
 }
+
+// Missing types in schema-1 configurations retain their original atmosphere behavior.
+func (m Mood) IsBase() bool { return m.Type == "base" }
 
 type Show struct {
 	Slots       []string `json:"slots"`
@@ -370,6 +374,11 @@ func (c Config) Validate() error {
 		if id != "" && !moodIDs[id] {
 			return invalid("show must reference existing moods or empty strings")
 		}
+		for _, mood := range c.Moods {
+			if mood.ID == c.Show.PauseMoodID && mood.IsBase() {
+				return invalid("show.pauseMoodId must reference an atmosphere mood")
+			}
+		}
 	}
 	return nil
 }
@@ -384,6 +393,9 @@ func validateMoods(moods []Mood, groups map[string]bool) error {
 	for _, m := range moods {
 		if err := identity(m.ID, m.Name, "moods", ids); err != nil {
 			return err
+		}
+		if m.Type != "" && m.Type != "atmosphere" && m.Type != "base" {
+			return invalid("mood %q type must be atmosphere or base", m.ID)
 		}
 		if !finiteRange(m.BeatsPerChange, 0.25, 128) || !finiteRange(m.Smoothness, 0.05, 1) ||
 			!finiteRange(m.CrossfadeSeconds, 0, 30) {
@@ -411,6 +423,9 @@ func validateMoods(moods []Mood, groups map[string]bool) error {
 			}
 			if !unit(g.IntensityMin) || !unit(g.IntensityMax) || g.IntensityMin > g.IntensityMax || !unit(g.UV) {
 				return invalid("mood %q intensity must be an ordered range from 0 to 1, and UV from 0 to 1", m.ID)
+			}
+			if m.IsBase() && (g.ColorMode != "static" || len(g.Palette) != 1 || g.IntensityMin != g.IntensityMax) {
+				return invalid("base mood %q requires one static colour and fixed intensity per group", m.ID)
 			}
 		}
 	}

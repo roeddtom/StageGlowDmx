@@ -17,6 +17,15 @@ type light struct {
 	RGB       [3]float64
 	Intensity float64
 	UV        float64
+	coverage  float64
+}
+
+type moodLayer struct {
+	active   string
+	start    float64
+	fadeFrom map[string]light
+	fadeAt   time.Time
+	fadeFor  float64
 }
 
 type FixtureState struct {
@@ -32,32 +41,32 @@ type FixtureState struct {
 }
 
 type State struct {
-	Blackout      bool           `json:"blackout"`
-	OutputEnabled bool           `json:"outputEnabled"`
-	EngineStatus  string         `json:"engineStatus"`
-	ActiveMoodID  string         `json:"activeMoodId"`
-	BPM           float64        `json:"bpm"`
-	Master        float64        `json:"master"`
-	Fixtures      []FixtureState `json:"fixtures"`
-	DMX           [512]int       `json:"dmx"`
+	Blackout         bool           `json:"blackout"`
+	OutputEnabled    bool           `json:"outputEnabled"`
+	EngineStatus     string         `json:"engineStatus"`
+	ActiveMoodID     string         `json:"activeMoodId"`
+	ActiveBaseMoodID string         `json:"activeBaseMoodId"`
+	BPM              float64        `json:"bpm"`
+	Master           float64        `json:"master"`
+	Fixtures         []FixtureState `json:"fixtures"`
+	DMX              [512]int       `json:"dmx"`
 }
 
 type Engine struct {
-	mu       sync.Mutex
-	cfg      config.Config
-	clock    func() time.Time
-	last     time.Time
-	epoch    time.Time
-	anchor   float64
-	beats    float64
-	seed     uint64
-	active   string
-	start    float64
-	blackout bool
-	master   float64
-	fadeFrom map[string]light
-	fadeAt   time.Time
-	fadeFor  float64
+	mu         sync.Mutex
+	cfg        config.Config
+	clock      func() time.Time
+	last       time.Time
+	epoch      time.Time
+	anchor     float64
+	beats      float64
+	seed       uint64
+	blackout   bool
+	master     float64
+	atmosphere moodLayer
+	base       moodLayer
+	restoreAt  time.Time
+	restoreFor float64
 }
 
 func New(c config.Config, clock func() time.Time, seed int64) *Engine {
@@ -67,7 +76,7 @@ func New(c config.Config, clock func() time.Time, seed int64) *Engine {
 	now := clock()
 	return &Engine{
 		cfg: c.Copy(), clock: clock, last: now, epoch: now, seed: uint64(seed),
-		blackout: true, master: 1, fadeFrom: make(map[string]light),
+		blackout: true, master: 1,
 	}
 }
 
@@ -77,31 +86,41 @@ func (e *Engine) Configure(c config.Config) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	now := e.advance()
-	before := e.lights(now)
+	beforeAtmosphere := e.layerLights(e.atmosphere, now)
+	beforeBase := e.layerLights(e.base, now)
 	patchChanged := e.cfg.ActiveLoadoutID != c.ActiveLoadoutID ||
 		!reflect.DeepEqual(e.cfg.Loadouts, c.Loadouts) || !reflect.DeepEqual(e.cfg.Profiles, c.Profiles)
-	oldMood := e.mood()
+	oldMood, oldBase := e.mood(e.atmosphere.active), e.mood(e.base.active)
 	if c.BPM != e.cfg.BPM {
 		e.anchor, e.epoch = e.beats, now
 	}
 	e.cfg = c.Copy()
-	nextMood := e.mood()
+	nextMood, nextBase := e.mood(e.atmosphere.active), e.mood(e.base.active)
 	if patchChanged {
 		e.blackout = true
-		e.fadeFrom = make(map[string]light)
-		e.fadeFor = 0
+		e.atmosphere.fadeFrom, e.base.fadeFrom = nil, nil
+		e.atmosphere.fadeFor, e.base.fadeFor = 0, 0
 	}
-	if nextMood == nil {
-		e.active = ""
-		e.blackout = true
-		e.fadeFor = 0
+	if nextMood == nil || nextMood.IsBase() {
+		if e.atmosphere.active != "" {
+			e.blackout = true
+		}
+		e.atmosphere = moodLayer{}
 	} else if !reflect.DeepEqual(oldMood, nextMood) {
-		e.start = e.beats
-		e.fadeFrom, e.fadeAt, e.fadeFor = before, now, nextMood.CrossfadeSeconds
+		e.atmosphere.start = e.beats
+		e.atmosphere.fadeFrom, e.atmosphere.fadeAt, e.atmosphere.fadeFor = beforeAtmosphere, now, nextMood.CrossfadeSeconds
+	}
+	if nextBase == nil || !nextBase.IsBase() {
+		if e.base.active != "" {
+			e.blackout = true
+			e.base = moodLayer{}
+		}
+	} else if !reflect.DeepEqual(oldBase, nextBase) {
+		e.base.fadeFrom, e.base.fadeAt, e.base.fadeFor = beforeBase, now, nextBase.CrossfadeSeconds
 	}
 }
 
-// Select changes only the simulation's pending mood, never releasing blackout.
+// Select updates the matching layer without releasing blackout or restarting the other.
 func (e *Engine) Select(id string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -116,23 +135,46 @@ func (e *Engine) Select(id string) error {
 		return fmt.Errorf("select an existing saved mood")
 	}
 	now := e.advance()
-	e.fadeFrom = e.lights(now)
-	e.fadeAt, e.fadeFor = now, selected.CrossfadeSeconds
-	e.active, e.start = id, e.beats
+	layer := &e.atmosphere
+	if selected.IsBase() {
+		layer = &e.base
+	}
+	layer.fadeFrom = e.layerLights(*layer, now)
+	layer.fadeAt, layer.fadeFor = now, selected.CrossfadeSeconds
+	layer.active, layer.start = id, e.beats
 	return nil
+}
+
+func (e *Engine) ClearBase() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	now := e.advance()
+	duration := e.base.fadeFor
+	if mood := e.mood(e.base.active); mood != nil {
+		duration = mood.CrossfadeSeconds
+	}
+	e.base.fadeFrom = e.layerLights(e.base, now)
+	e.base.fadeAt, e.base.fadeFor, e.base.active = now, duration, ""
 }
 
 func (e *Engine) Blackout(enabled bool) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	now := e.advance()
-	mood := e.mood()
-	if !enabled && mood == nil {
+	mood, base := e.mood(e.atmosphere.active), e.mood(e.base.active)
+	if !enabled && mood == nil && base == nil {
 		return fmt.Errorf("select a mood before releasing simulation blackout")
 	}
 	if e.blackout && !enabled {
-		e.fadeFrom = make(map[string]light)
-		e.fadeAt, e.fadeFor = now, mood.CrossfadeSeconds
+		e.atmosphere.fadeFor, e.base.fadeFor = 0, 0
+		e.atmosphere.fadeFrom, e.base.fadeFrom = nil, nil
+		e.restoreAt, e.restoreFor = now, 0
+		if mood != nil {
+			e.restoreFor = mood.CrossfadeSeconds
+		}
+		if base != nil {
+			e.restoreFor = math.Max(e.restoreFor, base.CrossfadeSeconds)
+		}
 	}
 	e.blackout = enabled
 	return nil
@@ -154,7 +196,7 @@ func (e *Engine) State() State {
 	now := e.advance()
 	values := e.lights(now)
 	state := State{
-		Blackout: e.blackout, EngineStatus: "simulation", ActiveMoodID: e.active,
+		Blackout: e.blackout, EngineStatus: "simulation", ActiveMoodID: e.atmosphere.active, ActiveBaseMoodID: e.base.active,
 		BPM: e.cfg.BPM, Master: e.master, Fixtures: []FixtureState{},
 	}
 	profiles := make(map[string]config.Profile, len(e.cfg.Profiles))
@@ -202,9 +244,9 @@ func (e *Engine) advance() time.Time {
 	return now
 }
 
-func (e *Engine) mood() *config.Mood {
+func (e *Engine) mood(id string) *config.Mood {
 	for i := range e.cfg.Moods {
-		if e.cfg.Moods[i].ID == e.active {
+		if e.cfg.Moods[i].ID == id {
 			return &e.cfg.Moods[i]
 		}
 	}
@@ -212,23 +254,43 @@ func (e *Engine) mood() *config.Mood {
 }
 
 func (e *Engine) lights(now time.Time) map[string]light {
+	base := e.layerLights(e.base, now)
+	atmosphere := e.layerLights(e.atmosphere, now)
+	restore := fadeProgress(now, e.restoreAt, e.restoreFor)
+	for id, value := range atmosphere {
+		fallback := base[id]
+		for i := range value.RGB {
+			value.RGB[i] = (value.RGB[i] + fallback.RGB[i]*(1-value.coverage)) * restore
+		}
+		value.Intensity = (value.Intensity + fallback.Intensity*(1-value.coverage)) * restore
+		value.UV = (value.UV + fallback.UV*(1-value.coverage)) * restore
+		base[id] = value
+	}
+	return base
+}
+
+func fadeProgress(now time.Time, at time.Time, duration float64) float64 {
+	if duration <= 0 {
+		return 1
+	}
+	t := math.Min(1, math.Max(0, now.Sub(at).Seconds()/duration))
+	return t * t * (3 - 2*t)
+}
+
+func (e *Engine) layerLights(layer moodLayer, now time.Time) map[string]light {
 	result := make(map[string]light)
-	mood := e.mood()
-	if mood == nil {
-		return result
+	mood := e.mood(layer.active)
+	settings := make(map[string]config.MoodGroup)
+	segment, blend := uint64(0), 0.0
+	if mood != nil {
+		for _, group := range mood.Groups {
+			settings[group.GroupID] = group
+		}
+		progress := math.Max(0, e.beats-layer.start) / mood.BeatsPerChange
+		segment = uint64(math.Floor(progress))
+		blend = glide(progress-math.Floor(progress), mood.Smoothness)
 	}
-	settings := make(map[string]config.MoodGroup, len(mood.Groups))
-	for _, group := range mood.Groups {
-		settings[group.GroupID] = group
-	}
-	progress := math.Max(0, e.beats-e.start) / mood.BeatsPerChange
-	segment := uint64(math.Floor(progress))
-	blend := glide(progress-math.Floor(progress), mood.Smoothness)
-	fade := 1.0
-	if e.fadeFor > 0 {
-		fade = math.Min(1, math.Max(0, now.Sub(e.fadeAt).Seconds()/e.fadeFor))
-		fade = fade * fade * (3 - 2*fade)
-	}
+	fade := fadeProgress(now, layer.fadeAt, layer.fadeFor)
 	for _, loadout := range e.cfg.Loadouts {
 		if loadout.ID != e.cfg.ActiveLoadoutID {
 			continue
@@ -236,6 +298,7 @@ func (e *Engine) lights(now time.Time) map[string]light {
 		for _, fixture := range loadout.Fixtures {
 			var value light
 			if group, ok := settings[fixture.GroupID]; ok {
+				value.coverage = 1
 				key := mood.ID + "\x00" + fixture.ID
 				position := 0.0
 				if group.ColorMode == "palette" {
@@ -249,12 +312,13 @@ func (e *Engine) lights(now time.Time) map[string]light {
 					value.RGB[i] = color[i] * intensity
 				}
 			}
-			previous := e.fadeFrom[fixture.ID]
+			previous := layer.fadeFrom[fixture.ID]
 			for i := range value.RGB {
 				value.RGB[i] = lerp(previous.RGB[i], value.RGB[i], fade)
 			}
 			value.Intensity = lerp(previous.Intensity, value.Intensity, fade)
 			value.UV = lerp(previous.UV, value.UV, fade)
+			value.coverage = lerp(previous.coverage, value.coverage, fade)
 			result[fixture.ID] = value
 		}
 	}

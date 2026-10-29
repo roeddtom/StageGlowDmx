@@ -222,6 +222,12 @@ func (c *Controller) Select(id string) error {
 	return c.engine.Select(id)
 }
 
+func (c *Controller) ClearBase() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.engine.ClearBase()
+}
+
 func (c *Controller) Master(value float64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

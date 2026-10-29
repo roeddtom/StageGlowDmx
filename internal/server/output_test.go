@@ -39,6 +39,8 @@ func TestUSBOutputAPI(t *testing.T) {
 		ID: "red", Name: "Red", BeatsPerChange: 8, Smoothness: 1,
 		Groups: []config.MoodGroup{{GroupID: "front", ColorMode: "static", Palette: []string{"#ff0000"}, IntensityMin: 1, IntensityMax: 1}},
 	}}
+	c.Moods = append(c.Moods, config.Mood{ID: "base", Name: "Front base", Type: "base", BeatsPerChange: 8, Smoothness: 1,
+		Groups: []config.MoodGroup{{GroupID: "front", ColorMode: "static", Palette: []string{"#0000ff"}, IntensityMin: 0.25, IntensityMax: 0.25}}})
 	if err := store.Save(c); err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +84,16 @@ func TestUSBOutputAPI(t *testing.T) {
 	}
 	call("POST", "/api/simulation", `{"action":"blackout","enabled":false}`, 409)
 	call("POST", "/api/simulation", `{"action":"master","value":0.5}`, 409)
+	call("POST", "/api/simulation", `{"action":"clear-base"}`, 409)
+	call("POST", "/api/lighting", `{"action":"select","moodId":"base"}`, 200)
+	if s := state(); s.ActiveBaseMoodID != "base" || s.ActiveMoodID != "red" || !s.Blackout {
+		t.Fatal("hardware base selection did not preserve atmosphere/blackout", s)
+	}
+	call("POST", "/api/lighting", `{"action":"clear-base","enabled":true}`, 400)
+	call("POST", "/api/lighting", `{"action":"clear-base"}`, 200)
+	if s := state(); s.ActiveBaseMoodID != "" || s.ActiveMoodID != "red" {
+		t.Fatal("No base altered atmosphere", s)
+	}
 	call("POST", "/api/lighting", `{"action":"blackout","enabled":false}`, 200)
 	if device.frames[len(device.frames)-1][0] != 255 {
 		t.Fatal("hardware release did not send mood")

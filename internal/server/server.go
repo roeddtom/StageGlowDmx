@@ -131,12 +131,14 @@ func NewWithOutput(store *config.Store, frontend http.Handler, controller *outpu
 			switch {
 			case command.Action == "select" && command.MoodID != nil && command.Enabled == nil && command.Value == nil:
 				err = controller.Select(*command.MoodID)
+			case command.Action == "clear-base" && command.MoodID == nil && command.Enabled == nil && command.Value == nil:
+				controller.ClearBase()
 			case command.Action == "blackout" && command.Enabled != nil && command.MoodID == nil && command.Value == nil:
 				err = controller.Blackout(*command.Enabled, hardware)
 			case command.Action == "master" && command.Value != nil && command.MoodID == nil && command.Enabled == nil:
 				err = controller.Master(*command.Value)
 			default:
-				err = fmt.Errorf("use select with moodId, blackout with enabled, or master with value")
+				err = fmt.Errorf("use select with moodId, clear-base, blackout with enabled, or master with value")
 			}
 			if err != nil {
 				fail(w, http.StatusBadRequest, err.Error())
