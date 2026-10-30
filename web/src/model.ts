@@ -121,6 +121,7 @@ export const templates: { name: string; kinds: ChannelKind[] }[] = [
   { name: 'RGBA', kinds: ['red', 'green', 'blue', 'amber'] },
   { name: 'RGBW', kinds: ['red', 'green', 'blue', 'white'] },
   { name: 'RGBWAUV', kinds: ['red', 'green', 'blue', 'white', 'amber', 'uv'] },
+  { name: 'Algam Lighting SLIMPAR1210 QUAD (8ch)', kinds: ['dimmer', 'red', 'green', 'blue', 'white', 'fixed', 'fixed', 'fixed'] },
 ]
 
 export function makeTemplate(name: string, kinds: ChannelKind[]): Profile {
@@ -128,7 +129,9 @@ export function makeTemplate(name: string, kinds: ChannelKind[]): Profile {
     id: makeId(),
     name,
     footprint: kinds.length,
-    channels: kinds.map((kind, offset) => ({ offset, kind })),
+    channels: kinds.map((kind, offset) => kind === 'fixed'
+      ? { offset, kind, value: 0, blackoutValue: 0 }
+      : { offset, kind }),
     whiteMix: 1,
     amberMix: 1,
   }

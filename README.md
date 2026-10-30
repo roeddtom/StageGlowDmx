@@ -99,6 +99,26 @@ lighting works without selecting an Atmosphere. Neither selection persists after
 restart. Deleting a selected mood or changing its type clears that layer and
 latches blackout; changing a Pause mood to Base clears its Pause assignment.
 
+### Algam Lighting SLIMPAR1210 QUAD
+
+On Fixtures, select **Algam Lighting SLIMPAR1210 QUAD (8ch)** and apply the
+profile, then assign it to fixtures at their actual DMX addresses. Set the light
+to DMX mode; this profile uses its eight-channel map:
+
+| Channel | Function | Control |
+|---|---|---|
+| 1 | Master dimmer | Mood intensity and global master |
+| 2-5 | Red, Green, Blue, White | Mood colour with white extraction |
+| 6 | Strobe | Fixed 0 (off) |
+| 7 | Effect | Fixed 0 (normal dimming, no built-in program) |
+| 8 | Speed | Fixed 0 (unused without a built-in effect) |
+
+Strobe, Effect and Speed remain separate fixed profile settings (offsets 5-7),
+not evolving mood controls. Their blackout values are also 0. Leave them at
+these defaults for gentle lighting. Editing a shared profile affects every
+fixture using it; disable USB before changing the channel map or fixed values.
+See the [manual's DMX chart](https://www.manualslib.com/manual/3524258/Algam-Lighting-Slimpar1210-Quad.html?page=16).
+
 ## Test moods through USB
 
 Connect an original **ENTTEC DMX USB PRO** or **Eurolite USB-DMX512 PRO MK2** to the computer running the Go service

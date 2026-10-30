@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { emptyConfig, makeTemplate, makeMood, removeMood, tapBPM, validateConfig } from './model.ts'
+import { emptyConfig, makeTemplate, templates, makeMood, removeMood, tapBPM, validateConfig } from './model.ts'
 
 function patchedRig() {
   const config = emptyConfig()
@@ -12,6 +12,27 @@ function patchedRig() {
 }
 
 describe('configuration validation', () => {
+  it('creates an eight-channel SLIMPAR1210 QUAD profile with effects safely fixed off', () => {
+    const config = patchedRig()
+    const template = templates.find((item) => item.name === 'Algam Lighting SLIMPAR1210 QUAD (8ch)')
+    assert.ok(template)
+    const profile = makeTemplate(template.name, template.kinds)
+    config.profiles = [profile]
+    config.loadouts[0].fixtures[0].profileId = profile.id
+    assert.equal(profile.footprint, 8)
+    assert.deepEqual(profile.channels, [
+      { offset: 0, kind: 'dimmer' },
+      { offset: 1, kind: 'red' },
+      { offset: 2, kind: 'green' },
+      { offset: 3, kind: 'blue' },
+      { offset: 4, kind: 'white' },
+      { offset: 5, kind: 'fixed', value: 0, blackoutValue: 0 },
+      { offset: 6, kind: 'fixed', value: 0, blackoutValue: 0 },
+      { offset: 7, kind: 'fixed', value: 0, blackoutValue: 0 },
+    ])
+    assert.deepEqual(validateConfig(config), [])
+  })
+
   it('accepts legacy atmospheres and validates static base moods and Pause type', () => {
     const config = patchedRig()
     const mood = makeMood(config.groups)

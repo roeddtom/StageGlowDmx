@@ -508,6 +508,7 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
           </div>)}
         </div>
         <button className="button small" onClick={addChannel} disabled={profileDraft.footprint >= 512}>Add fixed channel</button>
+        <p className="subtle">Offsets start at 0: channel 1 is offset 0. Fixed channels are separate profile settings, not mood controls. On the SLIMPAR1210 QUAD, offsets 5, 6 and 7 are Strobe, Effect and Speed; leave all three at 0 for steady, mood-controlled lighting.</p>
         <div className="form-grid two mix-row">
           {input('White contribution (0-1)', profileDraft.whiteMix, (raw) => setProfileDraft({ ...profileDraft, whiteMix: Number(raw) }), { type: 'number', min: 0, max: 1, step: 0.01 })}
           {input('Amber contribution (0-1)', profileDraft.amberMix, (raw) => setProfileDraft({ ...profileDraft, amberMix: Number(raw) }), { type: 'number', min: 0, max: 1, step: 0.01 })}
