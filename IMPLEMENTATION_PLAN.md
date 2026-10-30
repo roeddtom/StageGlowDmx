@@ -143,7 +143,10 @@ A profile defines a name, DMX footprint, and zero-based channel offsets:
 
 Require every channel in the footprint to have an explicit supported function or
 fixed value. Reject duplicate offsets, invalid offsets, and values outside 0-255.
-Release one requires RGB-capable profiles; other fixture types wait for later.
+Profiles support complete RGB maps or white-only intensity fixtures. Repeated
+colour/white channels link multiple emitters to one fixture's mood values;
+only one master dimmer is allowed. White-only profiles ignore palette colours
+and follow intensity. Independent emitter zones remain deferred.
 Profiles with colour wheels or 16-bit movement channels are not automatically
 supported merely because fixed channel values can be entered.
 

@@ -119,6 +119,30 @@ these defaults for gentle lighting. Editing a shared profile affects every
 fixture using it; disable USB before changing the channel map or fixed values.
 See the [manual's DMX chart](https://www.manualslib.com/manual/3524258/Algam-Lighting-Slimpar1210-Quad.html?page=16).
 
+### Linked-emitter bar profiles
+
+The fixture templates also include:
+
+| Profile | Mode | Mood control | Fixed at 0 |
+|---|---|---|---|
+| Algam Lighting BARWASH 244 | 8ch **H001**, not E001 | Master + RGBW | Strobe, colour macros/programs, function speed |
+| Eurolite LED CBB-2 COB RGB Bar | 11ch | Master + identical RGB on both emitters | Strobe, both colour presets, internal programs |
+| Eurolite LED CBB-2 COB WW Bar | 5ch | Master + linked warm-white emitters | Strobe, internal programs |
+
+Both emitters are treated as one fixture, not independent zones. Repeated
+colour/white channels receive the same generated value. Only one channel is
+the master dimmer; on the WW bar its Left and Right dimmers are mapped as
+`white`, held fully open while the master controls brightness. White-only
+fixtures ignore mood colours (even black) and use mood intensity instead;
+set intensity to zero or use blackout to darken them. Their preview uses
+neutral white to indicate brightness, not calibrated colour temperature.
+
+Strobe and built-in programs remain separate fixed profile values, outside mood
+control, with zero blackout values. Verify these no-effect defaults against
+your fixture's manual/revision before enabling USB. The Barwash H001 map is
+documented in its [manual](https://www.manualslib.com/manual/3457847/Algam-Lighting-Barwash-244.html?page=22);
+the Eurolite maps follow the supplied channel order.
+
 ## Test moods through USB
 
 Connect an original **ENTTEC DMX USB PRO** or **Eurolite USB-DMX512 PRO MK2** to the computer running the Go service

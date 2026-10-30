@@ -408,6 +408,13 @@ colour, intensity, and UV once. Blackout itself is enforced by channel rendering
 
 ### Mapping fixture values to channels
 
+Profiles may repeat colour channels to link several emitters. `render` writes
+the same mapped value to each matching offset; only the master dimmer must be
+unique. A white-only profile ignores RGB palette targets and uses mood intensity.
+With a master dimmer its white emitter channels stay fully open, and intensity,
+crossfade and global master are applied once through the master dimmer. Without
+a master dimmer, brightness is applied directly to each white channel.
+
 The engine looks up each fixture's profile and calls `render`.
 That function handles RGB, approximate white/amber extraction, UV, optional
 dimmer, fixed safe channel values, master brightness, and blackout.

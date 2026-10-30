@@ -122,6 +122,9 @@ export const templates: { name: string; kinds: ChannelKind[] }[] = [
   { name: 'RGBW', kinds: ['red', 'green', 'blue', 'white'] },
   { name: 'RGBWAUV', kinds: ['red', 'green', 'blue', 'white', 'amber', 'uv'] },
   { name: 'Algam Lighting SLIMPAR1210 QUAD (8ch)', kinds: ['dimmer', 'red', 'green', 'blue', 'white', 'fixed', 'fixed', 'fixed'] },
+  { name: 'Algam Lighting BARWASH 244 (8ch H001)', kinds: ['dimmer', 'red', 'green', 'blue', 'white', 'fixed', 'fixed', 'fixed'] },
+  { name: 'Eurolite LED CBB-2 COB RGB Bar (11ch)', kinds: ['dimmer', 'fixed', 'red', 'green', 'blue', 'red', 'green', 'blue', 'fixed', 'fixed', 'fixed'] },
+  { name: 'Eurolite LED CBB-2 COB WW Bar (5ch)', kinds: ['dimmer', 'fixed', 'white', 'white', 'fixed'] },
 ]
 
 export function makeTemplate(name: string, kinds: ChannelKind[]): Profile {
@@ -245,7 +248,7 @@ export function validateConfig(input: unknown): string[] {
         errors.push(`Profile "${profile.name}" has an unsupported channel kind.`)
         continue
       }
-      if (channel.kind !== 'fixed' && kinds.has(channel.kind)) errors.push(`Profile "${profile.name}" repeats its ${channel.kind} channel.`)
+      if (channel.kind === 'dimmer' && kinds.has(channel.kind)) errors.push(`Profile "${profile.name}" repeats its master dimmer channel.`)
       if (channel.kind !== 'fixed') kinds.add(channel.kind)
       if (channel.kind === 'fixed' && !isIntegerIn(channel.value, 0, 255)) {
         errors.push(`Profile "${profile.name}" fixed channel at offset ${channel.offset} needs a safe value from 0 to 255.`)
@@ -256,7 +259,9 @@ export function validateConfig(input: unknown): string[] {
       }
     }
     if (offsets.size !== profile.footprint) errors.push(`Profile "${profile.name}" must define every offset from 0 to ${profile.footprint - 1}.`)
-    for (const kind of ['red', 'green', 'blue']) if (!kinds.has(kind)) errors.push(`Profile "${profile.name}" needs exactly one ${kind} channel.`)
+    if (['red', 'green', 'blue'].some((kind) => kinds.has(kind)) || !kinds.has('white')) {
+      for (const kind of ['red', 'green', 'blue']) if (!kinds.has(kind)) errors.push(`Profile "${profile.name}" needs a ${kind} channel for RGB lighting.`)
+    }
     if (!isFiniteIn(profile.whiteMix, 0, 1)) errors.push(`Profile "${profile.name}" white mix must be 0-1.`)
     if (!isFiniteIn(profile.amberMix, 0, 1)) errors.push(`Profile "${profile.name}" amber mix must be 0-1.`)
   }

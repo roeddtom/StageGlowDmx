@@ -474,7 +474,7 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
       <div className="profile-grid">
         {config.profiles.length === 0 && <div className="empty-state">No profiles saved. Choose a template to begin.</div>}
         {config.profiles.map((profile) => <article className="profile-card" key={profile.id}>
-          <div className="card-title-row"><div><h3>{profile.name}</h3><span className="subtle">{profile.footprint} channels</span></div><span className="profile-tag">RGB PROFILE</span></div>
+          <div className="card-title-row"><div><h3>{profile.name}</h3><span className="subtle">{profile.footprint} channels</span></div><span className="profile-tag">{profile.channels.some((channel) => channel.kind === 'red') ? 'RGB PROFILE' : 'WHITE PROFILE'}</span></div>
           <div className="channel-chips">{profile.channels.slice().sort((a, b) => a.offset - b.offset).map((channel) => <span className={`channel-chip ${channel.kind}`} key={channel.offset}><b>{channel.offset}</b> {channel.kind === 'fixed' ? `fixed ${channel.value}` : channel.kind}</span>)}</div>
           <div className="card-actions"><button className="text-button" onClick={() => { setProfileDraft(structuredClone(profile)); setProfileMessage('') }}>Edit map</button><button className="text-button danger-text" onClick={() => deleteProfile(profile)}>Delete</button></div>
         </article>)}
@@ -509,6 +509,7 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
         </div>
         <button className="button small" onClick={addChannel} disabled={profileDraft.footprint >= 512}>Add fixed channel</button>
         <p className="subtle">Offsets start at 0: channel 1 is offset 0. Fixed channels are separate profile settings, not mood controls. On the SLIMPAR1210 QUAD, offsets 5, 6 and 7 are Strobe, Effect and Speed; leave all three at 0 for steady, mood-controlled lighting.</p>
+        <p className="subtle">Repeated colour channels follow the same mood colour on every emitter. Use only one master dimmer; on a white-only bar, map Left and Right dimmers as white. White-only fixtures follow mood intensity and ignore colour. Keep strobe, presets, programs and speed fixed at their manual's no-effect values. BARWASH 244 uses H001 mode for this eight-channel profile, not E001.</p>
         <div className="form-grid two mix-row">
           {input('White contribution (0-1)', profileDraft.whiteMix, (raw) => setProfileDraft({ ...profileDraft, whiteMix: Number(raw) }), { type: 'number', min: 0, max: 1, step: 0.01 })}
           {input('Amber contribution (0-1)', profileDraft.amberMix, (raw) => setProfileDraft({ ...profileDraft, amberMix: Number(raw) }), { type: 'number', min: 0, max: 1, step: 0.01 })}

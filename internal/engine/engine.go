@@ -217,6 +217,9 @@ func (e *Engine) State() State {
 			}
 			display.Intensity *= e.master
 			display.UV *= e.master
+			if whiteOnly(profile) {
+				display.RGB = [3]float64{display.Intensity, display.Intensity, display.Intensity}
+			}
 			if e.blackout {
 				display = light{}
 			}
@@ -375,6 +378,17 @@ func channel(value float64) int {
 	return int(math.Round(math.Max(0, math.Min(1, value)) * 255))
 }
 
+func whiteOnly(profile config.Profile) bool {
+	hasWhite := false
+	for _, ch := range profile.Channels {
+		if ch.Kind == "red" || ch.Kind == "green" || ch.Kind == "blue" {
+			return false
+		}
+		hasWhite = hasWhite || ch.Kind == "white"
+	}
+	return hasWhite
+}
+
 func render(profile config.Profile, value light, master float64, blackout bool) ([]int, bool) {
 	kinds := make(map[string]bool)
 	for _, ch := range profile.Channels {
@@ -391,7 +405,14 @@ func render(profile config.Profile, value light, master float64, blackout bool) 
 	}
 	white, amber := 0.0, 0.0
 	if kinds["white"] {
-		white = math.Min(rgb[0], math.Min(rgb[1], rgb[2])) * profile.WhiteMix
+		if whiteOnly(profile) {
+			white = value.Intensity
+			if kinds["dimmer"] {
+				white = 1
+			}
+		} else {
+			white = math.Min(rgb[0], math.Min(rgb[1], rgb[2])) * profile.WhiteMix
+		}
 		for i := range rgb {
 			rgb[i] -= white
 		}

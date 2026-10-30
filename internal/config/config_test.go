@@ -106,9 +106,37 @@ func TestOptionalChannelsAndPatchBoundaries(t *testing.T) {
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	c.Profiles[0].Channels[8].Kind = "white"
+	c.Profiles[0].Channels[8].Kind = "dimmer"
 	if err := c.Validate(); err == nil {
-		t.Fatal("duplicate optional channel accepted")
+		t.Fatal("duplicate master dimmer accepted")
+	}
+}
+
+func TestLinkedEmittersAndWhiteOnlyProfiles(t *testing.T) {
+	for _, kinds := range [][]string{
+		{"dimmer", "fixed", "red", "green", "blue", "red", "green", "blue", "fixed", "fixed", "fixed"},
+		{"dimmer", "fixed", "white", "white", "fixed"},
+		{"white", "white", "fixed"},
+	} {
+		c := rig()
+		p := &c.Profiles[0]
+		p.Footprint, p.Channels = len(kinds), nil
+		zero := 0
+		for offset, kind := range kinds {
+			ch := Channel{Offset: offset, Kind: kind}
+			if kind == "fixed" {
+				ch.Value, ch.BlackoutValue = &zero, &zero
+			}
+			p.Channels = append(p.Channels, ch)
+		}
+		c.Loadouts[0].Fixtures[0].StartAddress = 1
+		if err := c.Validate(); err != nil {
+			t.Fatal("linked emitters or white-only profile rejected", kinds, err)
+		}
+		p.Channels[2].Offset = 1
+		if c.Validate() == nil {
+			t.Fatal("duplicate offset accepted for linked emitters")
+		}
 	}
 }
 

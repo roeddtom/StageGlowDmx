@@ -12,6 +12,29 @@ function patchedRig() {
 }
 
 describe('configuration validation', () => {
+  it('accepts linked RGB and white-only bar templates with programs fixed off', () => {
+    const config = patchedRig()
+    const expected = new Map([
+      ['Algam Lighting BARWASH 244 (8ch H001)', ['dimmer', 'red', 'green', 'blue', 'white', 'fixed', 'fixed', 'fixed']],
+      ['Eurolite LED CBB-2 COB RGB Bar (11ch)', ['dimmer', 'fixed', 'red', 'green', 'blue', 'red', 'green', 'blue', 'fixed', 'fixed', 'fixed']],
+      ['Eurolite LED CBB-2 COB WW Bar (5ch)', ['dimmer', 'fixed', 'white', 'white', 'fixed']],
+    ])
+    for (const [name, kinds] of expected) {
+      const template = templates.find((item) => item.name === name)
+      assert.ok(template)
+      const profile = makeTemplate(template.name, template.kinds)
+      config.profiles = [profile]
+      config.loadouts[0].fixtures[0].profileId = profile.id
+      assert.equal(profile.footprint, kinds.length)
+      assert.deepEqual(profile.channels.map((channel) => channel.kind), kinds)
+      assert.ok(profile.channels.filter((channel) => channel.kind === 'fixed').every((channel) => channel.value === 0 && channel.blackoutValue === 0))
+      assert.deepEqual(validateConfig(config), [])
+      const next = structuredClone(config)
+      next.profiles[0].channels[1] = { offset: 1, kind: 'dimmer' }
+      assert.match(validateConfig(next).join(' '), /repeats its master dimmer/)
+    }
+  })
+
   it('creates an eight-channel SLIMPAR1210 QUAD profile with effects safely fixed off', () => {
     const config = patchedRig()
     const template = templates.find((item) => item.name === 'Algam Lighting SLIMPAR1210 QUAD (8ch)')
@@ -182,7 +205,7 @@ describe('configuration validation', () => {
     profile.channels.push({ offset: 2, kind: 'fixed' })
     const errors = validateConfig(config).join(' ')
     assert.match(errors, /fixed channel at offset 2 needs a safe value/)
-    assert.match(errors, /needs exactly one red channel/)
+    assert.match(errors, /needs a red channel/)
     assert.match(errors, /repeats offset 1/)
   })
 

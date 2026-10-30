@@ -286,8 +286,8 @@ func (c Config) Validate() error {
 			offsets[ch.Offset] = true
 			switch ch.Kind {
 			case "red", "green", "blue", "white", "amber", "uv", "dimmer":
-				if kinds[ch.Kind] {
-					return invalid("profile %q has duplicate %s channels", p.ID, ch.Kind)
+				if ch.Kind == "dimmer" && kinds[ch.Kind] {
+					return invalid("profile %q has duplicate master dimmer channels", p.ID)
 				}
 				kinds[ch.Kind] = true
 			case "fixed":
@@ -303,8 +303,9 @@ func (c Config) Validate() error {
 				}
 			}
 		}
-		if !kinds["red"] || !kinds["green"] || !kinds["blue"] {
-			return invalid("profile %q requires one red, green and blue channel", p.ID)
+		hasRGB := kinds["red"] || kinds["green"] || kinds["blue"]
+		if (hasRGB || !kinds["white"]) && (!kinds["red"] || !kinds["green"] || !kinds["blue"]) {
+			return invalid("profile %q requires complete RGB channels or white-only lighting", p.ID)
 		}
 		profiles[p.ID] = p
 	}
