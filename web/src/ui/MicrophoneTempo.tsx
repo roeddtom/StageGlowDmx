@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { bandEnergy, normalizeTempo, TempoDetector, type TempoFocus } from '../tempo'
+import { normalizeTempo, SpectralFlux, TempoDetector, type TempoFocus } from '../tempo'
 
 type Props = {
   bpm: number
@@ -61,6 +61,7 @@ export function MicrophoneTempo({ bpm, available, manualVersion, onTempo }: Prop
         source.connect(analyser) // Never connect microphone audio to the speakers.
         const spectrum = new Float32Array(analyser.frequencyBinCount)
         const detector = new TempoDetector()
+        const flux = new SpectralFlux()
         let lastUpdate = -Infinity
         let lastBeat = performance.now()
         setStatus('Listening')
@@ -73,10 +74,10 @@ export function MicrophoneTempo({ bpm, available, manualVersion, onTempo }: Prop
             return
           }
           analyser.getFloatFrequencyData(spectrum)
-          const detected = detector.sample(now, bandEnergy(spectrum, context.sampleRate, analyser.fftSize, focus), latest.current.bpm)
+          const detected = detector.sample(now, flux.sample(spectrum, context.sampleRate, analyser.fftSize, focus), latest.current.bpm)
           if (detected !== undefined) {
             lastBeat = now
-            setStatus(`${detected} BPM`)
+            setStatus('Following beat')
             if (now - lastUpdate >= 5000 && Math.abs(detected - latest.current.bpm) >= 2) {
               const next = Math.abs(detected - latest.current.bpm) <= 10
                 ? Math.round(latest.current.bpm * 0.6 + detected * 0.4) : detected
@@ -102,7 +103,7 @@ export function MicrophoneTempo({ bpm, available, manualVersion, onTempo }: Prop
     <select aria-label="Microphone rhythm focus" value={focus} disabled={!available} onChange={(event) => setFocus(event.target.value as TempoFocus)}>
       <option value="kick">Kick</option><option value="snare">Snare</option><option value="full">Full band</option>
     </select>
-    <span role="status">{enabled ? status : error ? 'Mic unavailable' : 'Manual tempo'}</span>
+    {enabled && <span role="status">{status}</span>}
     {error && <span className="mic-error" role="alert">{error}</span>}
   </div>
 }

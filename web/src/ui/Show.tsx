@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { emptyShow, makeMood, tapBPM, type Config, type RuntimeState } from '../model'
 import type { SimulationCommand } from './Moods'
 import { MicrophoneTempo } from './MicrophoneTempo'
@@ -9,6 +9,33 @@ type Props = {
   ready: boolean
   busy: boolean
   onUpdate: (config: Config) => void
+}
+
+function MasterDimmer({ value, available, busy, onCommand }: {
+  value: number
+  available: boolean
+  busy: boolean
+  onCommand: (command: SimulationCommand) => Promise<void>
+}) {
+  const [draft, setDraft] = useState<number>()
+  const inFlight = useRef(false)
+  useEffect(() => {
+    if (!available) { setDraft(undefined); return }
+    if (busy || inFlight.current || draft === undefined) return
+    const timer = window.setTimeout(() => {
+      inFlight.current = true
+      void onCommand({ action: 'master', value: draft }).finally(() => {
+        inFlight.current = false
+        setDraft((current) => current === draft ? undefined : current)
+      })
+    }, 80)
+    return () => window.clearTimeout(timer)
+  }, [draft, available, busy, onCommand])
+  const level = draft ?? value
+  return <label className="show-master">Master
+    <input type="range" min="0" max="1" step="0.01" aria-label="Show master brightness" aria-valuetext={`${Math.round(level * 100)}%`} value={level} disabled={!available} onChange={(event) => setDraft(Number(event.target.value))} />
+    <output>{Math.round(level * 100)}%</output>
+  </label>
 }
 
 export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'config' | 'ready' | 'onUpdate'> & { onEnter: () => void }) {
@@ -98,8 +125,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
       </div>
       <div className="show-levels">
         <button className="button show-no-base" disabled={!canPlay || !base} onClick={() => void onCommand({ action: 'clear-base' })}>No base</button>
-        <label>Master <select aria-label="Show master brightness" value={runtime?.master ?? 1} disabled={!canPlay} onChange={(event) => void onCommand({ action: 'master', value: Number(event.target.value) })}>{[0, 0.1, 0.25, 0.5, 0.75, 1].map((value) => <option key={value} value={value}>{Math.round(value * 100)}%</option>)}</select></label>
-        <span>{config.bpm} BPM<small className="show-tempo-status">{!ready && runtime ? ' / save unavailable' : runtime && runtime.bpm !== config.bpm ? ' / saving tempo' : ''}</small></span>
+        <MasterDimmer value={runtime?.master ?? 1} available={ready && !!runtime && !fault} busy={busy} onCommand={onCommand} />
       </div>
       <MicrophoneTempo bpm={config.bpm} available={ready && !!runtime && !fault} manualVersion={manualVersion} onTempo={(bpm) => onUpdate({ ...config, bpm })} />
     </header>

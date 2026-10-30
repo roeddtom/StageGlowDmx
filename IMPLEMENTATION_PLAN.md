@@ -9,7 +9,8 @@ select/restore preview workflow. USB enablement and startup still begin blacked
 out; entering Show alone does not release it.
 
 Browser-microphone tempo is implemented as an opt-in Show toggle, with kick,
-snare or full-band emphasis, onset consistency gating, 50-180 BPM limits
+snare or full-band emphasis, spectral-flux attacks and recurring-beat alignment
+with confidence gating, 50-180 BPM limits
 (slower/faster estimates doubled/halved into range),
 smoothed/rate-limited tempo updates and manual tap override. Audio stays local
 to the browser; silence holds tempo. Capture stops on Show exit, page hiding,

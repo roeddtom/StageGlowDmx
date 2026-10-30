@@ -226,6 +226,10 @@ In Show, toggle **Mic OFF / ON** and grant microphone access. Choose **Kick**
 bands emphasize likely drum transients; they do not isolate instruments from
 a live mix. Audio is analysed only in the browser, never recorded, uploaded,
 or played through the speakers. Only the resulting BPM is saved to StageGlow.
+Detection uses positive spectral changes rather than overall loudness, so
+sustained instruments are less likely to hide drum attacks. Repeated beat
+alignment tolerates occasional extra hits and missed beats; dense or heavily
+syncopated mixes can still be ambiguous.
 
 Detection stays within **50-180 BPM**. Slower estimates are doubled until in
 range; faster estimates are halved until in range (40 becomes 80, 200 becomes

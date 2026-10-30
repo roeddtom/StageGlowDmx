@@ -233,7 +233,9 @@ input::placeholder { color: #74807d; }
 .show-tools .button { min-height: 44px; padding: 0 10px; font-size: 12px; }
 .show-levels { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .show-levels label { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
-.show-levels select { min-height: 44px; width: auto; padding: 4px 8px; font-size: 12px; }
+.show-master { flex: 1; min-width: 0; }
+.show-master input[type="range"] { width: clamp(90px, 18vw, 240px); min-width: 0; flex: 1; height: 44px; margin: 0; padding: 0; border: 0; background: transparent; accent-color: var(--mint); }
+.show-master output { width: 4ch; text-align: right; font-size: 12px; }
 .show-message { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 8px; background: #40251f; color: #ffd3c9; font-size: 12px; flex: 0 0 auto; }
 .show-message button { min-width: 44px; min-height: 44px; background: transparent; color: inherit; border: 0; }
 .show-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(var(--show-rows), minmax(0, 1fr)); gap: 6px; }
@@ -282,7 +284,6 @@ input::placeholder { color: #74807d; }
   .show-tools { grid-column: 3; }
   .show-levels label { font-size: 0; }
   .show-levels { gap: 5px; }
-  .show-tempo-status { display: none; }
   .show-status strong, .show-status span { font-size: 10px; }
   .show-fixed { flex-basis: 60px; }
   .show-mood { gap: 3px; padding: 10px 6px 4px; }

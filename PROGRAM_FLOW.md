@@ -327,8 +327,11 @@ existing combination using the longer crossfade of the selected layers.
 ### Browser microphone tempo
 
 `MicrophoneTempo.tsx` owns a browser `MediaStream` and `AudioContext` only while
-Show's microphone toggle is on. An analyser reads kick/snare/full-band energy;
-`tempo.ts` detects onsets, checks interval consistency, and estimates a bounded
+Show's microphone toggle is on. An analyser reads kick/snare/full-band spectra;
+`tempo.ts` extracts positive log-magnitude spectral flux, detects adaptive local
+peaks, and scores repeated beat alignment across onset pairs. Phase coherence
+rejects irregular transients while allowing occasional extra or missing hits.
+It estimates a bounded
 50-180 BPM, doubling slower estimates or halving faster ones into range rather
 than clamping them. Several consistent estimates are required, with current BPM used to
 resolve half/double-time ambiguity. Audio stays in the browser; it is not
