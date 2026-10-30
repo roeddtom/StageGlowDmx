@@ -77,6 +77,8 @@ export class TempoDetector {
   private confirmations = 0
   private lastTime = -Infinity
 
+  get lastBeatTime(): number { return this.lastOnset }
+
   sample(time: number, energy: number, reference: number): number | undefined {
     if (!Number.isFinite(time) || !Number.isFinite(energy) || energy < 0) return
     if (time <= this.lastTime || time - this.lastTime > 2000) {
@@ -108,6 +110,12 @@ export class TempoDetector {
     this.candidate = bpm
     return this.confirmations >= 3 ? bpm : undefined
   }
+}
+
+export function signalStrength(samples: Float32Array): number {
+  const power = samples.reduce((sum, value) => sum + value * value, 0) / Math.max(1, samples.length)
+  if (!Number.isFinite(power) || power <= 0) return 0
+  return Math.round(Math.max(0, Math.min(1, (10 * Math.log10(power) + 60) / 48)) * 100)
 }
 
 export class SpectralFlux {

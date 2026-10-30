@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { normalizeTempo, SpectralFlux, TempoDetector, type TempoFocus } from '../tempo'
+import { normalizeTempo, signalStrength, SpectralFlux, TempoDetector, type TempoFocus } from '../tempo'
 
 type Props = {
   bpm: number
@@ -13,12 +13,14 @@ export function MicrophoneTempo({ bpm, available, manualVersion, onTempo }: Prop
   const [focus, setFocus] = useState<TempoFocus>('kick')
   const [status, setStatus] = useState('Off')
   const [error, setError] = useState('')
+  const [indicators, setIndicators] = useState({ level: 0, beat: false })
   const latest = useRef({ bpm, available, onTempo })
   latest.current = { bpm, available, onTempo }
   useEffect(() => { setEnabled(false) }, [manualVersion])
   useEffect(() => { if (!available) setEnabled(false) }, [available])
 
   useEffect(() => {
+    setIndicators({ level: 0, beat: false })
     if (!enabled) return
     let cancelled = false
     let stream: MediaStream | undefined
@@ -60,10 +62,12 @@ export function MicrophoneTempo({ bpm, available, manualVersion, onTempo }: Prop
         source = context.createMediaStreamSource(stream)
         source.connect(analyser) // Never connect microphone audio to the speakers.
         const spectrum = new Float32Array(analyser.frequencyBinCount)
+        const waveform = new Float32Array(analyser.fftSize)
         const detector = new TempoDetector()
         const flux = new SpectralFlux()
         let lastUpdate = -Infinity
         let lastBeat = performance.now()
+        let lastMeterUpdate = -Infinity
         setStatus('Listening')
         stream.getAudioTracks().forEach((track) => track.addEventListener('ended', () => fail('Microphone disconnected. Tap Mic to retry.'), { once: true }))
         timer = window.setInterval(() => {
@@ -75,6 +79,11 @@ export function MicrophoneTempo({ bpm, available, manualVersion, onTempo }: Prop
           }
           analyser.getFloatFrequencyData(spectrum)
           const detected = detector.sample(now, flux.sample(spectrum, context.sampleRate, analyser.fftSize, focus), latest.current.bpm)
+          if (now - lastMeterUpdate >= 80) {
+            analyser.getFloatTimeDomainData(waveform)
+            setIndicators({ level: signalStrength(waveform), beat: now - detector.lastBeatTime < 150 })
+            lastMeterUpdate = now
+          }
           if (detected !== undefined) {
             lastBeat = now
             setStatus('Following beat')
@@ -103,6 +112,12 @@ export function MicrophoneTempo({ bpm, available, manualVersion, onTempo }: Prop
     <select aria-label="Microphone rhythm focus" value={focus} disabled={!available} onChange={(event) => setFocus(event.target.value as TempoFocus)}>
       <option value="kick">Kick</option><option value="snare">Snare</option><option value="full">Full band</option>
     </select>
+    <span className="mic-indicator" title="Microphone input level, from quiet to strong (-60 to -12 dBFS).">
+      <i className="mic-signal-light" role="meter" aria-label="Microphone signal strength" aria-valuemin={0} aria-valuemax={100} aria-valuenow={enabled ? indicators.level : 0} style={{ opacity: enabled && indicators.level ? 0.2 + indicators.level * 0.008 : 0.15 }} />Signal
+    </span>
+    <span className="mic-indicator" title="Flashes for each detected rhythmic attack, even before tempo locks. Not a generated metronome.">
+      <i className={`mic-beat-light ${enabled && indicators.beat ? 'is-lit' : ''}`} role="img" aria-label={enabled && indicators.beat ? 'Beat detected' : 'No beat detected'} />Beat
+    </span>
     {enabled && <span role="status">{status}</span>}
     {error && <span className="mic-error" role="alert">{error}</span>}
   </div>

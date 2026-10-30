@@ -252,6 +252,11 @@ input::placeholder { color: #74807d; }
 .show-microphone { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; font-size: 11px; }
 .show-microphone .button, .show-microphone select { min-height: 36px; width: auto; padding: 4px 8px; font-size: 12px; }
 .show-microphone .mic-enabled { border-color: var(--mint); background: #254c3b; color: var(--mint); }
+.mic-indicator { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.mic-indicator i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.mic-signal-light { background: #73e5b7; box-shadow: 0 0 4px #73e5b7; }
+.mic-beat-light { background: #38454e; }
+.mic-beat-light.is-lit { background: #8bc7ff; box-shadow: 0 0 5px #8bc7ff; }
 .mic-error { flex-basis: 100%; color: #ffd3c9; overflow-wrap: anywhere; max-height: 3em; overflow-y: auto; }
 .show-fixed { flex: 0 0 clamp(72px, 13vh, 118px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .show-action { min-width: 0; min-height: 0; border: 2px solid #67706c; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #fff; touch-action: manipulation; }

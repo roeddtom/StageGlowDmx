@@ -1,8 +1,29 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { estimateTempo, normalizeTempo, TempoDetector, SpectralFlux } from './tempo.ts'
+import { estimateTempo, normalizeTempo, signalStrength, TempoDetector, SpectralFlux } from './tempo.ts'
 
 describe('microphone tempo', () => {
+  it('scales microphone signal from silence through quiet to loud input', () => {
+    assert.equal(signalStrength(new Float32Array(128)), 0)
+    assert.equal(signalStrength(new Float32Array()), 0)
+    const quiet = signalStrength(new Float32Array(128).fill(0.01))
+    const loud = signalStrength(new Float32Array(128).fill(0.1))
+    assert.ok(quiet > 0 && quiet < loud && loud < 100)
+    assert.equal(signalStrength(new Float32Array(128).fill(1)), 100)
+  })
+
+  it('reports individual attacks before BPM locks and does not invent beats in silence', () => {
+    const detector = new TempoDetector()
+    for (let time = 0; time < 500; time += 20) detector.sample(time, 0.001, 120)
+    assert.equal(detector.sample(500, 0.1, 120), undefined)
+    assert.equal(detector.sample(520, 0.001, 120), undefined)
+    assert.equal(detector.lastBeatTime, 500)
+    for (let time = 540; time < 2000; time += 20) detector.sample(time, 0.001, 120)
+    assert.equal(detector.lastBeatTime, 500)
+    detector.sample(10000, 0.001, 120)
+    assert.equal(detector.lastBeatTime, -Infinity)
+  })
+
   it('estimates bounded rhythms despite jitter and missed beats', () => {
     for (const bpm of [50, 60, 90, 120, 160, 180]) {
       const period = 60000 / bpm

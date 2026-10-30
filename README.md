@@ -230,6 +230,9 @@ Detection uses positive spectral changes rather than overall loudness, so
 sustained instruments are less likely to hide drum attacks. Repeated beat
 alignment tolerates occasional extra hits and missed beats; dense or heavily
 syncopated mixes can still be ambiguous.
+The small **Signal** light brightens with microphone input level. **Beat** flashes
+on each detected attack, even before BPM locks; it is not a metronome. Use these
+to check microphone placement and rhythm focus. Both go dark when Mic is off.
 
 Detection stays within **50-180 BPM**. Slower estimates are doubled until in
 range; faster estimates are halved until in range (40 becomes 80, 200 becomes
