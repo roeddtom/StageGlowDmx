@@ -147,6 +147,47 @@ func TestUSBFailureLatchesBlackoutAndNeverReconnects(t *testing.T) {
 	if status.Enabled || status.State != "fault" || status.Error == "" || !state.Blackout || opens.Load() != 1 {
 		t.Fatal("fault did not fail closed", state, status, opens.Load())
 	}
+	if c.Play("warm", false) == nil || c.Play("warm", true) == nil {
+		t.Fatal("performance action must not bypass fault")
+	}
+}
+
+func TestPerformancePlayReleasesBlackoutAndWritesImmediately(t *testing.T) {
+	for _, hardware := range []bool{false, true} {
+		d := &recordingDevice{}
+		c := readyController(t, d)
+		if hardware {
+			if err := c.Enable(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i := 0; i < 2; i++ {
+			c.Blackout(true, hardware)
+			if c.Play("missing", hardware) == nil {
+				t.Fatal("invalid mood accepted")
+			}
+			if state, _ := c.State(); !state.Blackout {
+				t.Fatal("invalid mood released blackout")
+			}
+			if c.Play("warm", !hardware) == nil {
+				t.Fatal("stale output mode released blackout")
+			}
+			before := len(d.frames)
+			if err := c.Play("warm", hardware); err != nil {
+				t.Fatal(err)
+			}
+			if state, _ := c.State(); state.Blackout || state.ActiveMoodID != "warm" {
+				t.Fatal("performance selection did not resume lighting")
+			}
+			if hardware && (len(d.frames) != before+1 || d.frames[before][0] != 128) {
+				t.Fatal("performance selection did not immediately write mood")
+			}
+		}
+		c.Shutdown()
+		if c.Play("warm", hardware) == nil {
+			t.Fatal("shutdown controller allowed performance play")
+		}
+	}
 }
 
 func TestPendingCleanupBlocksReenable(t *testing.T) {

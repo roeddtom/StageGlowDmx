@@ -76,6 +76,11 @@ func TestSimulationCommandsAndPersistedMoods(t *testing.T) {
 	if state().DMX[0] != 64 {
 		t.Fatal("master was not applied")
 	}
+	command(`{"action":"blackout","enabled":true}`, 200)
+	command(`{"action":"play","moodId":"warm"}`, 200)
+	if state().Blackout {
+		t.Fatal("Show play did not immediately release simulation blackout")
+	}
 	c.BPM = 60
 	w := request(h, http.MethodPut, "/api/config", payload(t, c))
 	if w.Code != 200 || state().BPM != 60 || state().Blackout {

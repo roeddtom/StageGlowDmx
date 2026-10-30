@@ -226,6 +226,28 @@ func (c *Controller) Select(id string) error {
 	return c.engine.Select(id)
 }
 
+// Play is an explicit performance action: select and release blackout atomically.
+func (c *Controller) Play(id string, hardware bool) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed || c.status.State == "fault" || c.status.CleanupPending || hardware != c.status.Enabled {
+		return errors.New("output unavailable or changed; refresh and check USB output before playing")
+	}
+	if err := c.engine.Select(id); err != nil {
+		return err
+	}
+	if err := c.engine.Blackout(false); err != nil {
+		return err
+	}
+	if c.status.Enabled {
+		if err := c.write(); err != nil {
+			c.fault(err)
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *Controller) ClearBase() {
 	c.mu.Lock()
 	defer c.mu.Unlock()

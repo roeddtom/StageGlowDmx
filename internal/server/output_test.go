@@ -91,6 +91,7 @@ func testUSBOutputAPI(t *testing.T, mode string) {
 	}
 	call("POST", "/api/simulation", `{"action":"blackout","enabled":false}`, 409)
 	call("POST", "/api/simulation", `{"action":"master","value":0.5}`, 409)
+	call("POST", "/api/simulation", `{"action":"play","moodId":"red"}`, 409)
 	call("POST", "/api/simulation", `{"action":"clear-base"}`, 409)
 	call("POST", "/api/lighting", `{"action":"select","moodId":"base"}`, 200)
 	if s := state(); s.ActiveBaseMoodID != "base" || s.ActiveMoodID != "red" || !s.Blackout {
@@ -108,6 +109,20 @@ func testUSBOutputAPI(t *testing.T, mode string) {
 	call("POST", "/api/simulation", `{"action":"blackout","enabled":true}`, 200)
 	if device.frames[len(device.frames)-1][0] != 0 {
 		t.Fatal("emergency simulation blackout must also darken USB")
+	}
+	call("POST", "/api/lighting", `{"action":"play","moodId":"missing"}`, 400)
+	call("POST", "/api/lighting", `{"action":"play","moodId":"red","enabled":true}`, 400)
+	if !state().Blackout {
+		t.Fatal("invalid play released blackout")
+	}
+	call("POST", "/api/lighting", `{"action":"play","moodId":"base"}`, 200)
+	if s := state(); s.Blackout || s.ActiveBaseMoodID != "base" || s.ActiveMoodID != "red" {
+		t.Fatal("performance Base button did not resume both layers", s)
+	}
+	call("POST", "/api/lighting", `{"action":"blackout","enabled":true}`, 200)
+	call("POST", "/api/lighting", `{"action":"play","moodId":"red"}`, 200)
+	if state().Blackout || device.frames[len(device.frames)-1][0] != 255 {
+		t.Fatal("performance atmosphere button did not release blackout")
 	}
 	modified := c.Copy()
 	modified.Loadouts[0].Fixtures[0].StartAddress = 10
