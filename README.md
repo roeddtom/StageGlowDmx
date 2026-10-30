@@ -265,8 +265,12 @@ There are no cloud services or internet requirements at show time.
 ```
 
 See [deployment instructions](deploy/README.md) for installing the self-contained
-ARMv7 binary as a boot service on Raspberry Pi OS Lite. The Pi needs no Node.js
-runtime and no internet connection to serve the application.
+ARMv7 binary as a boot service on **32-bit Raspberry Pi OS Lite**. The build also
+produces `build\stageglow-pi2.tar.gz` with an installer, service, guide and
+checksums. Import your downloaded rig backup on the Pi, then select its USB
+interface and Linux serial port separately. Phone/tablet microphone access
+requires the guide's trusted HTTPS setup.
+The Pi needs no Go/Node.js runtime and no internet connection to serve the app.
 
 ## Plan
 

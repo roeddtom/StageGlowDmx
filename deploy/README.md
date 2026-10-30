@@ -7,10 +7,17 @@ does not make the system show-ready; physical commissioning remains required.
 ## Prepare the appliance
 
 Use Raspberry Pi Imager to install a currently supported Raspberry Pi OS Lite
-image compatible with the exact Pi 2 revision. Prefer a 32-bit image. Configure
+32-bit image compatible with the exact Pi 2 revision. Configure
 a unique login and SSH access in Imager, and connect the Pi by Ethernet to the
 existing router. No desktop, Wi-Fi adapter, or internet connection at a show is
 required.
+
+The supplied bundle specifically requires **32-bit ARMv7** Raspberry Pi OS Lite,
+including on newer Pi models. It does not support Pi 1, original Pi Zero/Zero W,
+Pico, or a 64-bit OS. On the Pi, `uname -m` should report `armv7l` or `armv8l`.
+Use a suitable power supply and microSD card; undervoltage can interrupt USB.
+The Pi 2 has no built-in Wi-Fi, so Ethernet to your existing Wi-Fi router is
+the simplest setup.
 
 Reserve the Pi's address in the router. Keep a note of that address; local
 hostname resolution is not guaranteed on every phone. The app listens on port
@@ -18,22 +25,73 @@ hostname resolution is not guaranteed on every phone. The app listens on port
 
 ## Build on Windows
 
-Install Go and Node.js on the development machine, then from the repository root:
+Install Go and Node.js 24 or newer on the Windows development machine, then
+from the repository root:
 
 ```powershell
 .\scripts\build.ps1 -Target pi2
 ```
+
+If frontend dependencies are already installed, add `-SkipInstall`.
 
 The script installs locked frontend dependencies, checks both applications,
 bundles the UI, and cross-compiles a Linux ARMv7 binary with no C runtime
 dependency. Internet is needed on the development machine for initial dependency
 installation, not on the Pi at show time.
 
-Copy `build\stageglow-linux-armv7` and `deploy\stageglow.service` to the Pi using
-your SSH client's file-transfer feature. The Pi does not need Go, Node.js, npm,
-or a separate web server.
+The script also creates **`build\stageglow-pi2.tar.gz`** containing the binary,
+installer, service, this guide and SHA-256 checksums. No rig configuration,
+Windows COM port settings, certificates, or keys are included.
+The Pi does not need Go, Node.js, npm, or a separate web server.
 
-## Install on the Pi
+## Quick first installation
+
+First download a configuration backup from your working Windows app. This
+preserves the profiles, fixture patch, groups, moods and Show grid you already
+configured. Do not copy the Windows `data` directory to the Pi: USB settings
+are machine-local.
+
+Copy the bundle using your SSH client's file-transfer feature, or run this in
+Windows PowerShell (replace `youruser` and the example address):
+
+```powershell
+scp .\build\stageglow-pi2.tar.gz youruser@192.168.1.50:stageglow-pi2.tar.gz
+ssh youruser@192.168.1.50
+```
+
+Then run these commands **on the Linux Pi**:
+
+```sh
+mkdir -p ~/stageglow-install
+tar -xzf ~/stageglow-pi2.tar.gz -C ~/stageglow-install
+cd ~/stageglow-install
+sudo sh ./install.sh
+curl --fail http://localhost:8080/api/health
+```
+
+The installer verifies checksums, creates the service account if needed, grants
+serial access and enables startup at boot. It also works for updates: **black
+out and disable USB, and export a backup first**. It stops the old service,
+keeps its binary as `/opt/stageglow/stageglow.previous`, and preserves state and
+any HTTPS service override. Only the immediately preceding binary is retained.
+Installation/restart never enables physical output.
+
+Open `http://<pi-address>:8080` from your controlling device. Import the downloaded
+backup using the app's settings import, and verify your patch, moods and Show
+layout before proceeding. In Fixtures > Lighting output, select **Eurolite
+USB-DMX512 PRO MK2** for that interface, not ENTTEC, and choose the Pi's serial
+device. Your Windows `COM5` is intentionally not restored.
+
+Start with simulation only. Then follow **USB setup and commissioning** below
+with a dim fixture and master lowered. For microphone testing from a phone,
+tablet, or another computer, finish the **Local HTTPS** setup first; plain HTTP
+at the Pi address cannot normally access the browser microphone.
+
+Reboot once and confirm saved configuration survives but USB is disabled,
+blackout is on, and no mood is selected. Finally disconnect the router's
+internet uplink and repeat a sustained test over the local Wi-Fi.
+
+## Manual installation (alternative to the bundle installer)
 
 The following commands run **on the Linux Pi**, assuming the transferred files
 are in your login user's home directory:
@@ -101,7 +159,18 @@ keys out of Git/backups and restrict the server key to the service account.
 For example, store the pair in `/etc/stageglow/tls`, with the key owned by
 root, group `stageglow`, mode `640` and the directory mode `750`.
 
-Override the systemd `ExecStart` to use the paths:
+After transferring `stageglow.pem` and `stageglow-key.pem` to your Pi user's home
+directory, install them **on the Pi**:
+
+```sh
+sudo install -d -o root -g stageglow -m 750 /etc/stageglow/tls
+sudo install -o root -g stageglow -m 644 ~/stageglow.pem /etc/stageglow/tls/stageglow.pem
+sudo install -o root -g stageglow -m 640 ~/stageglow-key.pem /etc/stageglow/tls/stageglow-key.pem
+rm ~/stageglow-key.pem
+sudo systemctl edit stageglow
+```
+
+In the editor, add the following override for `ExecStart`:
 
 ```ini
 [Service]
@@ -109,7 +178,8 @@ ExecStart=
 ExecStart=/opt/stageglow/stageglow -listen :8443 -data /var/lib/stageglow -tls-cert /etc/stageglow/tls/stageglow.pem -tls-key /etc/stageglow/tls/stageglow-key.pem
 ```
 
-Restart the service and visit `https://<pi-address>:8443`, allowing TCP 8443 on
+Save, then run `sudo systemctl restart stageglow` and visit
+`https://<pi-address>:8443`, allowing TCP 8443 on
 the trusted show subnet if needed. Verify the browser shows a trusted connection
 and lets Mic request permission before rehearsal. A certificate-warning bypass
 is not a reliable microphone setup. No internet is required once certificates
@@ -119,6 +189,11 @@ operator authentication or make the application suitable for public exposure.
 The browser analyses its own microphone, not a microphone plugged into the Pi.
 Mic is opt-in in Show and turns off on exit, page hiding or connection loss.
 Last BPM remains active when detection stops.
+The Signal light indicates browser microphone level; Beat flashes for detected
+attacks, not a generated metronome. The Pi does not need an audio input for this.
+When using HTTPS, the HTTP listener on 8080 is replaced, not kept alongside it.
+Use `curl --cacert <path-to-rootCA.pem> https://<pi-address>:8443/api/health`
+from a computer holding the public root certificate for HTTPS health checks.
 
 ## USB setup and commissioning
 
@@ -126,7 +201,8 @@ Connect the original **ENTTEC DMX USB PRO** or **Eurolite USB-DMX512 PRO MK2** t
 Raspberry Pi OS FTDI virtual COM driver should provide `/dev/ttyUSB0` and a stable
 `/dev/serial/by-id/` symlink. Install the appropriate FTDI virtual COM driver if
 testing on Windows and no COM port appears. Open DMX USB is a different product
-and is unsupported; Mk2 and RDM operation are not targeted.
+and is unsupported; ENTTEC DMX USB PRO Mk2 and RDM operation are not targeted
+(the separately supported Eurolite MK2 is a different product).
 
 Inspect the Pi devices:
 

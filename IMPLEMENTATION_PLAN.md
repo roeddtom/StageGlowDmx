@@ -85,6 +85,11 @@ polling rather than WebSockets. Milestone 6's local performance controls and
 editing lock are complete; multi-operator ownership is still deferred. Sustained
 Pi 2 operation, physical boot verification, and real fixture/controller
 commissioning remain pending. The systemd unit has not been tested on the Pi.
+The Pi build now includes a checksummed `stageglow-pi2.tar.gz` deployment bundle
+and repeatable installer for 32-bit ARMv7 Raspberry Pi OS. The deployment guide
+covers transferring the bundle, importing the working rig, choosing the Pi's
+serial port, and trusted HTTPS for browser microphone testing. This preparation
+does not replace physical Pi acceptance.
 
 ## Goal and agreed scope
 

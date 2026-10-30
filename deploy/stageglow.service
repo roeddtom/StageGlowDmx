@@ -1,5 +1,5 @@
 [Unit]
-Description=StageGlowDmx local lighting and ENTTEC USB output
+Description=StageGlowDmx local lighting and USB DMX output
 Wants=network-online.target
 After=network-online.target
 StartLimitIntervalSec=60
