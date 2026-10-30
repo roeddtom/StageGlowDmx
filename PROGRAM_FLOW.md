@@ -288,10 +288,15 @@ required. `*command.Enabled` reads the supplied value after a nil check.
 Selecting a mood updates the layer matching its `type`: `base` or `atmosphere`.
 Missing types in older configurations mean atmosphere. The other layer's
 selection and time anchor do not change. The selected layer captures its current
-values as the start of its next crossfade. It **does not release blackout**.
+values as the start of its next crossfade. The editor's `select` command
+**does not release blackout**.
 
 Pause is not a separate engine mode: its fixed button selects the configured
-Pause atmosphere through this same path, retaining the selected Base.
+Pause atmosphere, retaining the selected Base. Show buttons use
+`{"action":"play","moodId":"..."}` instead: the controller selects and releases
+blackout under one lock, then immediately writes a USB frame if enabled. A fault,
+cleanup, shutdown or stale output mode rejects Play rather than bypassing safety.
+No browser-side select/release request pair is needed.
 `{"action":"clear-base"}` fades out the base without selecting another atmosphere.
 State responses expose `activeMoodId` for atmosphere and `activeBaseMoodId` for
 base. Both start empty after process restart.
@@ -315,9 +320,27 @@ The controller changes engine blackout and, if USB is armed, immediately attempt
 to write a frame. It uses the same lock as scheduled writes, so an older normal
 frame cannot race past the blackout write.
 
-While blackout is on, mood buttons still choose the pending mood. Tapping the
-Blackout toggle again restores the combination using the longer crossfade of
-the selected layers.
+While blackout is on, editor selections remain pending. Show Mood/Base/Pause
+buttons resume lighting directly; the Blackout toggle can also restore the
+existing combination using the longer crossfade of the selected layers.
+
+### Browser microphone tempo
+
+`MicrophoneTempo.tsx` owns a browser `MediaStream` and `AudioContext` only while
+Show's microphone toggle is on. An analyser reads kick/snare/full-band energy;
+`tempo.ts` detects onsets, checks interval consistency, and estimates a bounded
+50-210 BPM. Several consistent estimates are required, with current BPM used to
+resolve half/double-time ambiguity. Audio stays in the browser; it is not
+connected to the speakers or sent to Go.
+
+Confident changes use the same `onUpdate`/autosave flow as tap tempo, limited to
+one update per five seconds. The Go engine still owns lighting timing and keeps
+phase through BPM saves. Uncertain input holds the last tempo. The component's
+effect cleanup stops every track, disconnects the source, clears the timer and
+closes the audio context, including a late permission result after toggling off.
+Tap tempo, leaving/hiding Show and backend faults/disconnects turn capture off.
+Permission is opt-in and requires localhost or trusted HTTPS; `main.go` supports
+optional `-tls-cert` / `-tls-key` flags for local deployment.
 
 ## 6. How a mood becomes DMX values
 

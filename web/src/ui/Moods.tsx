@@ -4,6 +4,7 @@ import { MoodSlider } from './MoodSlider'
 
 export type SimulationCommand =
   | { action: 'select'; moodId: string }
+  | { action: 'play'; moodId: string }
   | { action: 'clear-base' }
   | { action: 'blackout'; enabled: boolean }
   | { action: 'master'; value: number }

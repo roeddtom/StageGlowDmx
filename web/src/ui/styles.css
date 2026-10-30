@@ -247,6 +247,10 @@ input::placeholder { color: #74807d; }
 .show-mood.show-base { border-style: dashed; border-color: #9c8ac7; background: #292338; }
 .show-mood.show-base.is-selected { border-color: #d3b9ff; background: #44325b; box-shadow: inset 0 0 0 2px #d3b9ff; }
 .show-no-base { min-height: 44px; padding: 0 8px; font-size: 12px; }
+.show-microphone { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; font-size: 11px; }
+.show-microphone .button, .show-microphone select { min-height: 36px; width: auto; padding: 4px 8px; font-size: 12px; }
+.show-microphone .mic-enabled { border-color: var(--mint); background: #254c3b; color: var(--mint); }
+.mic-error { flex-basis: 100%; color: #ffd3c9; overflow-wrap: anywhere; max-height: 3em; overflow-y: auto; }
 .show-fixed { flex: 0 0 clamp(72px, 13vh, 118px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .show-action { min-width: 0; min-height: 0; border: 2px solid #67706c; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #fff; touch-action: manipulation; }
 .show-action strong { font-size: clamp(16px, 2.5vw, 30px); line-height: 1.1; }
@@ -261,6 +265,11 @@ input::placeholder { color: #74807d; }
 @media (max-aspect-ratio: 1/1) {
   .show-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(var(--show-portrait-rows), minmax(0, 1fr)); }
   .show-mood strong { font-size: clamp(16px, 4vw, 30px); }
+}
+@media (max-height: 650px) and (max-aspect-ratio: 1/1) {
+  .show-mood { gap: 3px; padding: 12px 6px 4px; }
+  .show-palette { display: none; }
+  .show-slot-number { top: 2px; left: 4px; font-size: 9px; }
 }
 @media (min-width: 900px) and (min-aspect-ratio: 1/1) {
   .show-toolbar { grid-template-columns: minmax(0, 1fr) auto auto; }

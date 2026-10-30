@@ -1,6 +1,7 @@
 import { useRef, useState, type CSSProperties } from 'react'
 import { emptyShow, makeMood, tapBPM, type Config, type RuntimeState } from '../model'
 import type { SimulationCommand } from './Moods'
+import { MicrophoneTempo } from './MicrophoneTempo'
 
 type Props = {
   config: Config
@@ -43,7 +44,7 @@ export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'con
     <section className="panel">
       <h2>Before performing</h2>
       <p>Enable USB deliberately on Fixtures first if you want real lights; entering Show never enables hardware or releases blackout. Simulation remains available without the interface.</p>
-      <p>Base buttons change static fallback lighting; Atmosphere buttons change only the atmosphere selection. Both can be selected at once in any grid position. No base clears the fallback. During blackout both remain pending; tap Blackout again to restore their combination.</p>
+      <p>Base buttons change static fallback lighting; Atmosphere buttons change the atmosphere selection. Both can be selected at once in any grid position. No base clears the fallback. Mood, Base and Pause buttons immediately resume lighting from blackout, without another tap or confirmation. Blackout can also be toggled off to restore the current combination.</p>
       <p className="subtle">Show mode hides configuration and navigation. Leaving requires confirmation and does not stop output. Browser fullscreen is optional. A disconnected browser does not stop the server; output may continue.</p>
     </section>
   </div>
@@ -59,6 +60,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
   const taps = useRef<number[]>([])
   const [tapHint, setTapHint] = useState(false)
   const [fullscreenError, setFullscreenError] = useState('')
+  const [manualVersion, setManualVersion] = useState(0)
   const active = config.moods.find((mood) => mood.id === runtime?.activeMoodId)
   const base = config.moods.find((mood) => mood.id === runtime?.activeBaseMoodId)
   const pause = config.moods.find((mood) => mood.id === layout.pauseMoodId)
@@ -67,6 +69,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
   const canPlay = ready && !busy && !fault
   const tap = () => {
     if (!runtime) return
+    setManualVersion((version) => version + 1)
     const result = tapBPM(taps.current, performance.now())
     taps.current = result.taps
     setTapHint(result.bpm === undefined)
@@ -83,7 +86,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
     <header className="show-toolbar">
       <div className={`show-status ${!runtime || fault ? 'show-warning' : ''}`} role="status">
         <strong>{!runtime ? 'DISCONNECTED - OUTPUT UNKNOWN' : fault ? 'USB FAULT - LIGHTS MAY STAY ON' : hardware ? 'USB OUTPUT' : 'SIMULATION - USB DISABLED'}</strong>
-        <span title={`Base: ${base?.name ?? 'None'} | Atmosphere: ${active?.name ?? 'None'}`}>{runtime ? `${runtime.blackout ? 'BLACKOUT / pending' : 'Playing'}: ${active?.name ?? 'None'} | Base: ${base?.name ?? 'None'}` : 'Server may still be running lights. No commands queued.'}</span>
+        <span title={`Base: ${base?.name ?? 'None'} | Atmosphere: ${active?.name ?? 'None'}`}>{runtime ? `${runtime.blackout ? 'BLACKOUT' : 'Playing'}: ${active?.name ?? 'None'} | Base: ${base?.name ?? 'None'}` : 'Server may still be running lights. No commands queued.'}</span>
       </div>
       <div className="show-tools">
         <button className="button" onClick={() => void fullscreen()}>Fullscreen</button>
@@ -98,6 +101,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
         <label>Master <select aria-label="Show master brightness" value={runtime?.master ?? 1} disabled={!canPlay} onChange={(event) => void onCommand({ action: 'master', value: Number(event.target.value) })}>{[0, 0.1, 0.25, 0.5, 0.75, 1].map((value) => <option key={value} value={value}>{Math.round(value * 100)}%</option>)}</select></label>
         <span>{config.bpm} BPM<small className="show-tempo-status">{!ready && runtime ? ' / save unavailable' : runtime && runtime.bpm !== config.bpm ? ' / saving tempo' : ''}</small></span>
       </div>
+      <MicrophoneTempo bpm={config.bpm} available={ready && !!runtime && !fault} manualVersion={manualVersion} onTempo={(bpm) => onUpdate({ ...config, bpm })} />
     </header>
     {(message || fullscreenError) && <div className="show-message" role="alert"><span>{message || fullscreenError}</span><button aria-label="Dismiss show message" onClick={() => { onDismiss(); setFullscreenError('') }}>x</button></div>}
     <div className="show-grid" aria-label="Mood buttons" style={{ '--show-rows': Math.ceil(layout.slots.length / 4), '--show-portrait-rows': Math.ceil(layout.slots.length / 2) } as CSSProperties}>
@@ -105,17 +109,17 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
         const mood = config.moods.find((item) => item.id === id)
         const isBase = mood?.type === 'base'
         const selected = Boolean(mood && (isBase ? runtime?.activeBaseMoodId : runtime?.activeMoodId) === mood.id)
-        return <button key={index} className={`show-mood ${isBase ? 'show-base' : ''} ${selected ? 'is-selected' : ''}`} disabled={!canPlay || !mood} aria-pressed={selected} onClick={() => { if (mood) void onCommand({ action: 'select', moodId: mood.id }) }}>
+        return <button key={index} className={`show-mood ${isBase ? 'show-base' : ''} ${selected && !runtime?.blackout ? 'is-selected' : ''}`} disabled={!canPlay || !mood} aria-pressed={selected && !runtime?.blackout} onClick={() => { if (mood) void onCommand({ action: 'play', moodId: mood.id }) }}>
           <span className="show-slot-number">{index + 1}{isBase ? ' / BASE' : ''}</span>
           <strong>{mood?.name ?? 'Unassigned'}</strong>
-          <span className="show-slot-state">{selected ? (runtime?.blackout ? 'PENDING / BLACKOUT' : 'PLAYING') : mood ? isBase ? 'Static fallback' : `${mood.beatsPerChange} beats` : 'Assign in Show setup'}</span>
+          <span className="show-slot-state">{selected ? (runtime?.blackout ? 'Tap to resume' : 'PLAYING') : mood ? isBase ? 'Static fallback' : `${mood.beatsPerChange} beats` : 'Assign in Show setup'}</span>
           {mood && <span className="show-palette" aria-hidden="true">{mood.groups.flatMap((group) => group.palette).slice(0, 8).map((color, i) => <i key={i} style={{ backgroundColor: color }} />)}</span>}
         </button>
       })}
     </div>
     <div className="show-fixed" aria-label="Fixed performance buttons">
       <button className={`show-action show-blackout ${runtime?.blackout ? 'is-selected' : ''}`} disabled={busy || Boolean(runtime?.blackout && (!canPlay || (!active && !base)))} aria-pressed={runtime?.blackout ?? false} onClick={() => void onCommand({ action: 'blackout', enabled: !runtime || !runtime.blackout })}><strong>Blackout</strong><span>{!runtime ? 'State unknown' : runtime.blackout ? active || base ? 'ON / tap to restore' : 'ON / select a mood' : 'OFF / tap to black out'}</span></button>
-      <button className={`show-action show-pause ${pause && runtime?.activeMoodId === pause.id ? 'is-selected' : ''}`} disabled={!canPlay || !pause} aria-pressed={Boolean(pause && runtime?.activeMoodId === pause.id)} onClick={() => { if (pause) void onCommand({ action: 'select', moodId: pause.id }) }}><strong>Pause</strong><span>{pause ? runtime?.activeMoodId === pause.id ? runtime.blackout ? 'PENDING / BLACKOUT' : 'PLAYING' : 'Low light' : 'Not assigned'}</span></button>
+      <button className={`show-action show-pause ${pause && runtime?.activeMoodId === pause.id && !runtime?.blackout ? 'is-selected' : ''}`} disabled={!canPlay || !pause} aria-pressed={Boolean(pause && runtime?.activeMoodId === pause.id && !runtime?.blackout)} onClick={() => { if (pause) void onCommand({ action: 'play', moodId: pause.id }) }}><strong>Pause</strong><span>{pause ? runtime?.activeMoodId === pause.id ? runtime.blackout ? 'Tap to resume' : 'PLAYING' : 'Low light' : 'Not assigned'}</span></button>
       <button className="show-action show-tap" disabled={!runtime || fault} onClick={tap}><strong>Tap tempo</strong><span>{tapHint ? 'Tap again' : `${config.bpm} BPM`}</span></button>
     </div>
   </main>

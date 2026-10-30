@@ -61,7 +61,9 @@ lower values glide sooner and then hold. Palette targets and intensity targets
 are chosen independently for each fixture. White/amber extraction is approximate
 and controlled by the fixture profile; UV follows intensity and master brightness.
 
-Simulation blackout is immediate and stays latched across mood selections.
+On the Moods editor page, simulation blackout is immediate and stays latched
+across preview selections. In Show, pressing a Mood, Base or Pause button
+selects it and releases blackout immediately.
 Releasing it fades into the selected mood; it does not enable physical output.
 The server uses elapsed time rather than browser timers, so reconnecting does
 not restart the mood. Process restarts clear the selected mood and start blacked
@@ -92,7 +94,8 @@ still override the Base: exclude Front from Pause to preserve Base front lightin
 The supplied Pause starter includes every group, so adjust its group assignments
 when using it with a Base.
 
-Blackout overrides both layers; selections made while blacked out remain pending.
+Blackout overrides both layers. Moods-editor selections made while blacked out
+remain pending; Show mood buttons instead select and resume immediately.
 Releasing blackout fades in their combination over the longer selected
 crossfade duration. Master applies to the combined output once. Base-only
 lighting works without selecting an Atmosphere. Neither selection persists after
@@ -193,14 +196,14 @@ of stopping output available. See the [commissioning checklist](deploy/README.md
 2. Wait for Saved and choose **Enter show mode**. The grid fills the browser
    viewport; setup headers, navigation, and backups are hidden. **Fullscreen**
    optionally hides browser chrome where supported.
-3. Use the fixed bottom row: **Blackout**, **Pause**, **Tap tempo**. Mood and
-   Pause buttons crossfade while running. Blackout is immediate and latched;
-   during blackout, mood and Pause buttons select the pending mood only.
-   Tap **Blackout** again to restore the pending mood. It is a toggle, with no
-   separate release button or confirmation dialog, including for physical USB.
+3. Use the fixed bottom row: **Blackout**, **Pause**, **Tap tempo**. Blackout is
+   immediate, but is **not latched against Show selections**: tapping any Mood,
+   Base or Pause button selects it and resumes lighting through its crossfade.
+   Tap **Blackout** again to restore the existing combination instead. Neither
+   action requires a separate release or confirmation, including for physical USB.
 4. Master brightness stays in the compact top strip. Tap repeatedly to set
    global BPM; tempo autosaves without locking the performance buttons.
-   Active/pending labels distinguish what is selected from what is playing.
+   While blacked out, the previous selections show "Tap to resume".
 5. **Exit show** requires confirmation to unlock editing and does not change
    lighting. Assignments and Pause selection persist in backups, but performance
    mode, master brightness, selected Base/Atmosphere, and USB enablement do not persist
@@ -215,6 +218,36 @@ the browser. Blackout remains available as a best-effort command.
 
 Use one operator. The Show editing lock prevents accidental local navigation,
 not changes from another browser; multi-operator ownership is not implemented.
+
+### Browser microphone tempo
+
+In Show, toggle **Mic OFF / ON** and grant microphone access. Choose **Kick**
+(40-180 Hz, default), **Snare** (700-5000 Hz), or **Full band**. These frequency
+bands emphasize likely drum transients; they do not isolate instruments from
+a live mix. Audio is analysed only in the browser, never recorded, uploaded,
+or played through the speakers. Only the resulting BPM is saved to StageGlow.
+
+Detection stays within **50-210 BPM**. It needs several consistent beats
+(typically 5-10 seconds), suppresses rapid retriggers, smooths small adjustments,
+and updates global tempo at most once every five seconds. The mood's existing
+beats-per-change setting still determines how slowly the lighting moves.
+Silence or uncertain rhythm holds the last tempo; it never creates flashes.
+Half/double-time ambiguity is resolved toward the current BPM, so tap an
+approximate tempo first if the detector settles on the wrong octave.
+
+**Tap tempo switches the microphone off** for immediate manual override.
+Turning Mic off retains the last BPM. Exiting Show, hiding the page, losing
+the server connection, an output fault or a microphone interruption also
+stops capture. Re-enable deliberately; mic state is never persisted. Keep the
+browser foregrounded during use, and rehearse detection with the actual band
+and microphone placement: a clean kick/snare signal works best.
+
+Microphone capture requires **localhost or HTTPS with a certificate trusted by
+the browser/device**. `http://localhost:28092` works on the computer running the
+app; `http://<pi-address>:8080` generally cannot use a phone's microphone.
+Optional `-tls-cert` and `-tls-key` flags serve HTTPS directly; see
+[local HTTPS setup](deploy/README.md#local-https-for-browser-microphone).
+There are no cloud services or internet requirements at show time.
 
 ## Raspberry Pi
 

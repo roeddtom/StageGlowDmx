@@ -67,6 +67,59 @@ curl http://localhost:8080/api/health
 If a host firewall is enabled, allow TCP 8080 only from the trusted show subnet.
 Art-Net UDP firewall rules are not needed for this release.
 
+## Local HTTPS for browser microphone
+
+HTTP on `localhost` supports microphone capture for a browser on the same
+computer as StageGlow. Phones/tablets visiting the Pi's HTTP address generally
+cannot grant microphone access: browsers require a secure context.
+
+StageGlow can serve HTTPS directly:
+
+```powershell
+.\build\stageglow.exe -listen :8443 -data .\data -tls-cert C:\StageGlowTLS\stageglow.pem -tls-key C:\StageGlowTLS\stageglow-key.pem
+```
+
+Both TLS flags are required together. Without them the existing HTTP behavior
+is unchanged. Use a certificate covering the actual hostname/IP you visit,
+trusted on every controlling device. For example, with the external `mkcert`
+tool installed on your development computer, generate certificates **outside
+the repository** (replace the sample IP with your Pi's reserved address):
+
+```powershell
+New-Item -ItemType Directory -Force C:\StageGlowTLS
+Set-Location C:\StageGlowTLS
+mkcert -install
+mkcert -cert-file stageglow.pem -key-file stageglow-key.pem stageglow.local 192.168.1.50 localhost 127.0.0.1
+mkcert -CAROOT
+```
+
+Install the resulting CA's **root certificate** (`rootCA.pem` in the printed
+CA directory) as a trusted CA on each phone/tablet according to its OS instructions;
+iOS also requires enabling full trust. Never copy or share `rootCA-key.pem`.
+Copy only the server certificate and server key to the Pi. Keep all private
+keys out of Git/backups and restrict the server key to the service account.
+For example, store the pair in `/etc/stageglow/tls`, with the key owned by
+root, group `stageglow`, mode `640` and the directory mode `750`.
+
+Override the systemd `ExecStart` to use the paths:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/opt/stageglow/stageglow -listen :8443 -data /var/lib/stageglow -tls-cert /etc/stageglow/tls/stageglow.pem -tls-key /etc/stageglow/tls/stageglow-key.pem
+```
+
+Restart the service and visit `https://<pi-address>:8443`, allowing TCP 8443 on
+the trusted show subnet if needed. Verify the browser shows a trusted connection
+and lets Mic request permission before rehearsal. A certificate-warning bypass
+is not a reliable microphone setup. No internet is required once certificates
+and trust are installed. HTTPS here enables microphone access; it does not add
+operator authentication or make the application suitable for public exposure.
+
+The browser analyses its own microphone, not a microphone plugged into the Pi.
+Mic is opt-in in Show and turns off on exit, page hiding or connection loss.
+Last BPM remains active when detection stops.
+
 ## USB setup and commissioning
 
 Connect the original **ENTTEC DMX USB PRO** or **Eurolite USB-DMX512 PRO MK2** to the Pi, not the phone. The normal
@@ -112,7 +165,9 @@ Commission with a representative fixture at low brightness and UV off:
    palette drift, tempo changes, and crossfades against the software values.
    USB PRO repeats at its configured refresh rate; host updates are 30 Hz.
    The app does not change persistent break/MAB/refresh parameters.
-4. Verify blackout stays latched across mood selections and while enabling.
+4. Verify USB enablement starts blacked out, and Moods-editor selections retain
+   blackout. In Show, verify Mood/Base/Pause buttons immediately resume lighting
+   from blackout without a second tap.
    Verify disable and normal service stop send profile-safe blackout, including
    fixtures that need nonzero fixed-channel blackout values.
 5. While a safe dim mood runs, close the browser and reconnect: output should

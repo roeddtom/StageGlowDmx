@@ -2,6 +2,20 @@
 
 ## Implementation status (2026-10-27)
 
+Show blackout is now non-latching against explicit Mood/Base/Pause presses:
+the `play` command atomically selects and releases blackout, retaining existing
+crossfades and output-mode/fault guards. The Moods editor keeps its guarded
+select/restore preview workflow. USB enablement and startup still begin blacked
+out; entering Show alone does not release it.
+
+Browser-microphone tempo is implemented as an opt-in Show toggle, with kick,
+snare or full-band emphasis, onset consistency gating, 50-210 BPM limits,
+smoothed/rate-limited tempo updates and manual tap override. Audio stays local
+to the browser; silence holds tempo. Capture stops on Show exit, page hiding,
+backend loss or output faults. Optional HTTPS certificate/key flags support
+secure local microphone access on phones/tablets. Live-band accuracy still
+requires rehearsal with the actual browser and microphone placement.
+
 Eurolite USB-DMX512 PRO MK2 is also supported through an explicit
 `eurolite-mk2` output mode: 250,000 baud, full-universe framed output, and no
 ENTTEC parameter handshake. It retains the shared enable/blackout/fault
@@ -58,7 +72,7 @@ active/pending mood, USB/simulation/fault/connection status, optional browser
 fullscreen, and a confirmed exit to unlock editing. Show's Blackout button is a
 direct on/off toggle with no separate release control or confirmation dialog;
 restoring output requires a selected mood and a healthy connection.
-Normal mood/Pause changes do not prompt; they never override latched blackout.
+Normal Show mood/Pause changes do not prompt; they resume lighting from blackout.
 Unassigned slots are disabled. The Pause starter is static warm 10% light with
 UV off and remains editable. Schema-1 backups without a show layout receive
 eight unassigned slots.
@@ -91,7 +105,7 @@ Release one supports:
 - A show page with 8-12 ordinary mood slots plus dedicated Break and Blackout.
 - Local autosave and downloadable/importable configuration backups.
 
-No fixed gig deadline. Moving-head automation, microphone tempo detection,
+No fixed gig deadline. Moving-head automation, Pi-side microphone tempo detection,
 Bluetooth MIDI, haze control, strobing, bounded colour-space ranges, and Luminair
 import are outside release one.
 
@@ -237,9 +251,9 @@ RGB-only fixtures receive RGB fallback. Approximate matching is acceptable;
 physical colour matching is not promised without fixture calibration.
 
 Ordinary mood changes and Break use configurable crossfades, defaulting to
-3 seconds. Blackout takes effect on the next output frame and stays latched
-until explicitly released. Selecting a mood during blackout changes the pending
-mood without releasing blackout. The underlying mood clock continues; release
+3 seconds. Blackout takes effect immediately and remains until explicitly
+released or a Show Mood/Base/Pause button is pressed. Editor selections retain
+blackout for guarded previews. The underlying mood clock continues; release
 fades into its current state using the configured transition duration.
 
 Global tempo changes preserve the current rendered value and timing phase,
@@ -336,8 +350,9 @@ front lighting and slowly drifting blue/purple back lighting.
 High-contrast, large touch targets for 8-12 mood slots, persistent Blackout and
 Break controls, master brightness, tap tempo/BPM, active/pending mood indication,
 and controller/browser connection status. Avoid confirmations for normal
-performance actions. Make blackout visibly latched; tapping Blackout again
-restores the pending mood without a separate release control or confirmation.
+performance actions. Make active blackout visibly bright red; tapping Blackout
+again restores the previous combination. Mood/Base/Pause presses select and
+resume directly, without a separate release control or confirmation.
 
 An edit lock prevents accidental navigation into configuration. It does not
 claim to be authentication. Avoid reliance on hover, tiny sliders, or colour
@@ -425,10 +440,10 @@ for each commit.
 1. Moving heads: extend profiles with 8/16-bit pan/tilt, calibrated limits,
    patterns and bounded random movement. Add fixture-specific beam/shutter
    handling and commissioning before enabling motion on a live rig.
-2. Microphone tempo: compare a Pi-connected USB audio input with browser audio.
+2. Microphone tempo follow-ups (browser detection is implemented): evaluate a Pi-connected USB audio input if needed.
    Remote browser microphone capture normally requires HTTPS and permission;
-   the initial HTTP LAN deployment must not assume it will work. Evaluate
-   local HTTPS or Pi-side capture before choosing. Use confidence gating,
+   plain HTTP LAN deployment cannot assume it will work. Local HTTPS flags are
+   implemented; Pi-side capture remains optional. Retain confidence gating,
    smoothing, manual override and free-run fallback; never map audio transients
    directly to flashes.
 3. Bluetooth MIDI: validate Android/browser support with the actual pedal.

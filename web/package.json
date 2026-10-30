@@ -11,7 +11,7 @@
     "build": "npm run check && vite build",
     "check": "npm run typecheck && npm test",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/model.test.mjs"
+    "test": "node --test src/model.test.mjs src/tempo.test.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
