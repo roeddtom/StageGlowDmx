@@ -1,10 +1,29 @@
 param(
     [ValidateSet("host", "pi2")]
     [string]$Target = "host",
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+    [string]$GoPath
 )
 
 $ErrorActionPreference = "Stop"
+if ($GoPath) {
+    $goCommand = Get-Command $GoPath -CommandType Application -ErrorAction SilentlyContinue
+} else {
+    $goCommand = Get-Command go -CommandType Application -ErrorAction SilentlyContinue
+    if (-not $goCommand -and $env:ProgramFiles) {
+        $goCommand = Get-Command (Join-Path $env:ProgramFiles "Go\bin\go.exe") -CommandType Application -ErrorAction SilentlyContinue
+    }
+}
+if (-not $goCommand) {
+    throw "Go was not found. Install Go 1.23 or newer from https://go.dev/dl/ and open a new terminal, or pass -GoPath 'C:\path\to\go.exe'. An already-built build\stageglow-pi2.tar.gz can be copied to the Pi without rebuilding."
+}
+$goExecutable = $goCommand.Source
+if (-not (Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue)) {
+    throw "npm was not found. Install Node.js 24 or newer and open a new terminal."
+}
+if ($Target -eq "pi2" -and -not (Get-Command tar.exe -CommandType Application -ErrorAction SilentlyContinue)) {
+    throw "tar.exe was not found. Enable the Windows tar tool to create the Pi deployment bundle."
+}
 $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 try {
@@ -20,7 +39,7 @@ try {
         Pop-Location
     }
 
-    & go test ./...
+    & $goExecutable test ./...
     if ($LASTEXITCODE -ne 0) { throw "Backend tests failed." }
 
     $previousOS = $env:GOOS
@@ -39,7 +58,7 @@ try {
             $binary = "stageglow.exe"
         }
         New-Item -ItemType Directory -Force -Path (Join-Path $root "build") | Out-Null
-        & go build -trimpath -o (Join-Path $root "build\$binary") ./cmd/stageglow
+        & $goExecutable build -trimpath -o (Join-Path $root "build\$binary") ./cmd/stageglow
         if ($LASTEXITCODE -ne 0) { throw "Backend build failed." }
         if ($Target -eq "pi2") {
             $package = Join-Path $root "build\stageglow-pi2"

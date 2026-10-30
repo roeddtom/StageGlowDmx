@@ -34,6 +34,17 @@ from the repository root:
 
 If frontend dependencies are already installed, add `-SkipInstall`.
 
+If the build reports that `go` is not recognized, install Go 1.23 or newer from
+<https://go.dev/dl/> and open a new PowerShell window. The script also checks
+the standard `C:\Program Files\Go\bin\go.exe` location. For a portable Go install:
+
+```powershell
+.\scripts\build.ps1 -Target pi2 -SkipInstall -GoPath C:\Tools\Go\bin\go.exe
+```
+
+An existing `build\stageglow-pi2.tar.gz` can be installed directly without Go or
+Node.js; rebuilding is only necessary to include new source changes.
+
 The script installs locked frontend dependencies, checks both applications,
 bundles the UI, and cross-compiles a Linux ARMv7 binary with no C runtime
 dependency. Internet is needed on the development machine for initial dependency
