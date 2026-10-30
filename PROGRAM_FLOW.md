@@ -329,7 +329,8 @@ existing combination using the longer crossfade of the selected layers.
 `MicrophoneTempo.tsx` owns a browser `MediaStream` and `AudioContext` only while
 Show's microphone toggle is on. An analyser reads kick/snare/full-band energy;
 `tempo.ts` detects onsets, checks interval consistency, and estimates a bounded
-50-210 BPM. Several consistent estimates are required, with current BPM used to
+50-180 BPM, doubling slower estimates or halving faster ones into range rather
+than clamping them. Several consistent estimates are required, with current BPM used to
 resolve half/double-time ambiguity. Audio stays in the browser; it is not
 connected to the speakers or sent to Go.
 

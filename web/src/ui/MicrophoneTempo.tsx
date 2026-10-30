@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { bandEnergy, TempoDetector, type TempoFocus } from '../tempo'
+import { bandEnergy, normalizeTempo, TempoDetector, type TempoFocus } from '../tempo'
 
 type Props = {
   bpm: number
@@ -80,7 +80,7 @@ export function MicrophoneTempo({ bpm, available, manualVersion, onTempo }: Prop
             if (now - lastUpdate >= 5000 && Math.abs(detected - latest.current.bpm) >= 2) {
               const next = Math.abs(detected - latest.current.bpm) <= 10
                 ? Math.round(latest.current.bpm * 0.6 + detected * 0.4) : detected
-              latest.current.onTempo(Math.max(50, Math.min(210, next)))
+              latest.current.onTempo(normalizeTempo(next)!)
               lastUpdate = now
             }
           } else if (now - lastBeat > 4000) {
@@ -96,7 +96,7 @@ export function MicrophoneTempo({ bpm, available, manualVersion, onTempo }: Prop
   }, [enabled, focus])
 
   return <div className="show-microphone">
-    <button className={`button ${enabled ? 'mic-enabled' : ''}`} aria-pressed={enabled} disabled={!available && !enabled} onClick={() => { setError(''); setEnabled(!enabled); setStatus('Off') }} title="Local microphone tempo, 50-210 BPM. Tap tempo turns it off.">
+    <button className={`button ${enabled ? 'mic-enabled' : ''}`} aria-pressed={enabled} disabled={!available && !enabled} onClick={() => { setError(''); setEnabled(!enabled); setStatus('Off') }} title="Local microphone tempo, 50-180 BPM; slower/faster estimates are doubled/halved. Tap tempo turns it off.">
       Mic {enabled ? 'ON' : 'OFF'}
     </button>
     <select aria-label="Microphone rhythm focus" value={focus} disabled={!available} onChange={(event) => setFocus(event.target.value as TempoFocus)}>

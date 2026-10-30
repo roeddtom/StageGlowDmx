@@ -227,7 +227,9 @@ bands emphasize likely drum transients; they do not isolate instruments from
 a live mix. Audio is analysed only in the browser, never recorded, uploaded,
 or played through the speakers. Only the resulting BPM is saved to StageGlow.
 
-Detection stays within **50-210 BPM**. It needs several consistent beats
+Detection stays within **50-180 BPM**. Slower estimates are doubled until in
+range; faster estimates are halved until in range (40 becomes 80, 200 becomes
+100). Manual/tap tempo keeps its existing range. Detection needs several consistent beats
 (typically 5-10 seconds), suppresses rapid retriggers, smooths small adjustments,
 and updates global tempo at most once every five seconds. The mood's existing
 beats-per-change setting still determines how slowly the lighting moves.

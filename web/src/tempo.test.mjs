@@ -1,16 +1,36 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { estimateTempo, TempoDetector, bandEnergy } from './tempo.ts'
+import { estimateTempo, normalizeTempo, TempoDetector, bandEnergy } from './tempo.ts'
 
 describe('microphone tempo', () => {
   it('estimates bounded rhythms despite jitter and missed beats', () => {
-    for (const bpm of [50, 60, 90, 120, 160, 210]) {
+    for (const bpm of [50, 60, 90, 120, 160, 180]) {
       const period = 60000 / bpm
       const onsets = Array.from({ length: 14 }, (_, i) => 500 + i * period + (i % 2 ? 3 : -3))
       onsets.splice(6, 1)
       const result = estimateTempo(onsets, bpm)
       assert.ok(Math.abs(result - bpm) <= 3, `${bpm} -> ${result}`)
-      assert.ok(result >= 50 && result <= 210)
+      assert.ok(result >= 50 && result <= 180)
+    }
+  })
+
+  it('folds slow and fast estimates into 50-180 BPM rather than clamping', () => {
+    for (const [raw, expected] of [[25, 50], [40, 80], [49, 98], [50, 50], [180, 180], [181, 91], [200, 100], [210, 105], [360, 180], [400, 100]]) {
+      assert.equal(normalizeTempo(raw), expected)
+      const onsets = Array.from({ length: 24 }, (_, i) => i * 60000 / raw)
+      assert.equal(estimateTempo(onsets, raw), expected, `estimated ${raw}`)
+    }
+    for (const invalid of [0, -1, NaN, Infinity]) assert.equal(normalizeTempo(invalid), undefined)
+  })
+
+  it('folds out-of-range pulse trains through onset detection', () => {
+    for (const [raw, expected] of [[40, 80], [200, 100], [300, 150]]) {
+      const detector = new TempoDetector()
+      let result
+      for (let time = 0; time <= 24000; time += 20) {
+        result = detector.sample(time, time % (60000 / raw) < 40 ? 0.1 : 0.001, raw) ?? result
+      }
+      assert.equal(result, expected, `pulse train ${raw}`)
     }
   })
 

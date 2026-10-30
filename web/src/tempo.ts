@@ -1,11 +1,18 @@
 export type TempoFocus = 'kick' | 'snare' | 'full'
 
+export function normalizeTempo(bpm: number): number | undefined {
+  if (!Number.isFinite(bpm) || bpm <= 0) return
+  while (bpm < 50) bpm *= 2
+  while (bpm > 180) bpm /= 2
+  return Math.round(bpm)
+}
+
 // Missing beats and half/double-time rhythms are ambiguous: prefer the current tempo.
 export function estimateTempo(onsets: number[], reference: number): number | undefined {
   const intervals = onsets.slice(1).map((time, i) => time - onsets[i])
   if (intervals.length < 5 || onsets.at(-1)! - onsets[0] < 2500) return
   const candidates = intervals.flatMap((interval) => [0.5, 1, 2, 3, 4].map((beats) => 60000 * beats / interval))
-    .filter((bpm) => bpm >= 50 && bpm <= 210)
+    .filter((bpm) => Number.isFinite(bpm) && bpm > 0)
   let best: number | undefined
   let bestScore = -Infinity
   for (const bpm of candidates) {
@@ -20,7 +27,7 @@ export function estimateTempo(onsets: number[], reference: number): number | und
     }
     if (matches / intervals.length < 0.8) continue
     const score = matches / intervals.length - error / intervals.length -
-      0.12 * Math.abs(Math.log2(bpm / Math.max(50, Math.min(210, reference))))
+      0.12 * Math.abs(Math.log2(bpm / (Number.isFinite(reference) && reference > 0 ? reference : 120)))
     if (score > bestScore) { best = bpm; bestScore = score }
   }
   if (best === undefined) return
@@ -34,7 +41,7 @@ export function estimateTempo(onsets: number[], reference: number): number | und
       totalBeats += rounded
     }
   }
-  return Math.max(50, Math.min(210, Math.round(60000 * totalBeats / totalTime)))
+  return normalizeTempo(Math.round(60000 * totalBeats / totalTime))
 }
 
 export class TempoDetector {
@@ -59,7 +66,7 @@ export class TempoDetector {
     this.history = this.history.filter((sample) => time - sample.time < 1000)
     const baseline = this.history.reduce((sum, sample) => sum + sample.energy, 0) / Math.max(1, this.history.length)
     const onset = this.history.length >= 10 && energy > Math.max(0.003, baseline * 1.7) &&
-      energy - this.previous > Math.max(0.001, baseline * 0.3) && time - this.lastOnset >= 240
+      energy - this.previous > Math.max(0.001, baseline * 0.3) && time - this.lastOnset >= 120
     this.history.push({ time, energy })
     this.previous = energy
     if (time - this.lastOnset > 4000) { this.onsets = []; this.confirmations = 0 }
