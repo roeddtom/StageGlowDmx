@@ -64,7 +64,7 @@ export type Config = {
   artNet: { destinationIp: string; portAddress: number }
   bpm: number
   moods: Mood[]
-  output: { mode: 'simulation' | 'enttec' | 'artnet'; serialPort: string }
+  output: { mode: 'simulation' | 'enttec' | 'eurolite-mk2' | 'artnet'; serialPort: string }
   show: ShowLayout
 }
 
@@ -192,7 +192,7 @@ export function validateConfig(input: unknown): string[] {
   }
   if (!isFiniteIn(config.bpm, 20, 300)) errors.push('BPM must be between 20 and 300.')
   if ('output' in input && checkShape(config.output, 'Output settings', ['mode', 'serialPort'])) {
-    if (!['simulation', 'enttec', 'artnet'].includes(config.output.mode)) errors.push('Output mode must be simulation, enttec, or artnet.')
+    if (!['simulation', 'enttec', 'eurolite-mk2', 'artnet'].includes(config.output.mode)) errors.push('Output mode must be simulation, enttec, eurolite-mk2, or artnet.')
     const port = config.output.serialPort
     if (typeof port !== 'string' || (port !== '' && (
       !/^(COM[1-9][0-9]*|\/dev\/tty(USB|ACM)[0-9]+|\/dev\/serial\/by-id\/[A-Za-z0-9_:.+-]+)$/.test(port) ||

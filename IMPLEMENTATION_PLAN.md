@@ -2,6 +2,13 @@
 
 ## Implementation status (2026-10-27)
 
+Eurolite USB-DMX512 PRO MK2 is also supported through an explicit
+`eurolite-mk2` output mode: 250,000 baud, full-universe framed output, and no
+ENTTEC parameter handshake. It retains the shared enable/blackout/fault
+lifecycle. The ENTTEC mode and its handshake remain unchanged. The MK2's FTDI
+identity is generic, so selecting its physical model is required. Protocol
+reference: [OLA's Eurolite MK2 driver](https://github.com/OpenLightingProject/ola/blob/master/plugins/usbdmx/EurolitePro.cpp).
+
 Base/Atmosphere layering is implemented: mood type is explicit, with missing
 types retaining Atmosphere behavior. One static Base and one Atmosphere are
 selected independently; Atmosphere overrides its included groups and Base fills

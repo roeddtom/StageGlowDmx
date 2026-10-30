@@ -23,9 +23,16 @@ func (d *usbDevice) WriteFrame(_ context.Context, frame output.Frame) error {
 func (d *usbDevice) Close(context.Context) error { return nil }
 
 func TestUSBOutputAPI(t *testing.T) {
+	for _, mode := range []string{"enttec", "eurolite-mk2"} {
+		t.Run(mode, func(t *testing.T) { testUSBOutputAPI(t, mode) })
+	}
+}
+
+func testUSBOutputAPI(t *testing.T, mode string) {
+	t.Helper()
 	_, store, _ := setup(t)
 	c := store.Get()
-	c.Output = config.Output{Mode: "enttec", SerialPort: "COM3"}
+	c.Output = config.Output{Mode: mode, SerialPort: "COM3"}
 	c.Profiles = []config.Profile{{
 		ID: "rgb", Name: "RGB", Footprint: 3, WhiteMix: 1, AmberMix: 1,
 		Channels: []config.Channel{{Offset: 0, Kind: "red"}, {Offset: 1, Kind: "green"}, {Offset: 2, Kind: "blue"}},
@@ -76,7 +83,7 @@ func TestUSBOutputAPI(t *testing.T) {
 	call("POST", "/api/simulation", `{"action":"select","moodId":"red"}`, 200)
 	call("POST", "/api/simulation", `{"action":"blackout","enabled":false}`, 200)
 	call("POST", "/api/output", `{"enabled":true}`, 200)
-	if s := state(); !s.Blackout || !s.OutputEnabled || s.EngineStatus != "enttec" || s.Output.State != "enabled" {
+	if s := state(); !s.Blackout || !s.OutputEnabled || s.EngineStatus != mode || s.Output.State != "enabled" {
 		t.Fatal("enable must send blackout and publish hardware status", s)
 	}
 	if len(device.frames) != 1 || device.frames[0][0] != 0 {
@@ -104,6 +111,9 @@ func TestUSBOutputAPI(t *testing.T) {
 	}
 	modified := c.Copy()
 	modified.Loadouts[0].Fixtures[0].StartAddress = 10
+	call("PUT", "/api/config", payload(t, modified), 409)
+	modified = c.Copy()
+	modified.Output.Mode = "simulation"
 	call("PUT", "/api/config", payload(t, modified), 409)
 	call("POST", "/api/config/import", payload(t, c), 409)
 	modified = c.Copy()

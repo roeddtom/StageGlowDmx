@@ -1,7 +1,7 @@
 # Raspberry Pi deployment
 
 This development release supports mood simulation and explicitly enabled
-ENTTEC DMX USB PRO output. Art-Net is not implemented. Completing this installation
+ENTTEC DMX USB PRO and Eurolite USB-DMX512 PRO MK2 output. Art-Net is not implemented. Completing this installation
 does not make the system show-ready; physical commissioning remains required.
 
 ## Prepare the appliance
@@ -67,9 +67,9 @@ curl http://localhost:8080/api/health
 If a host firewall is enabled, allow TCP 8080 only from the trusted show subnet.
 Art-Net UDP firewall rules are not needed for this release.
 
-## ENTTEC USB setup and commissioning
+## USB setup and commissioning
 
-Connect the original **ENTTEC DMX USB PRO** to the Pi, not the phone. The normal
+Connect the original **ENTTEC DMX USB PRO** or **Eurolite USB-DMX512 PRO MK2** to the Pi, not the phone. The normal
 Raspberry Pi OS FTDI virtual COM driver should provide `/dev/ttyUSB0` and a stable
 `/dev/serial/by-id/` symlink. Install the appropriate FTDI virtual COM driver if
 testing on Windows and no COM port appears. Open DMX USB is a different product
@@ -90,11 +90,17 @@ only that group to the service; do not make devices world-writable or run the
 service as root. The unit intentionally does not use `PrivateDevices=true`,
 which would hide the USB device. Close other lighting apps using the same port.
 
-In Fixtures > Lighting output, choose ENTTEC, refresh ports, select the stable
+In Fixtures > Lighting output, choose the exact interface model, refresh ports, select the stable
 `/dev/serial/by-id/` entry, apply, and wait for Saved. Device listing does not
 identify the model; check the physical label. The read-only USB PRO handshake
 checks protocol compatibility, not brand identity. USB settings are stored only
 on this appliance and are stripped from downloaded/imported backups.
+
+Eurolite MK2 uses 250,000 baud and output framing without the ENTTEC read-only
+handshake. Its generic FTDI USB identity is not enough to auto-detect it; select
+Eurolite MK2 explicitly from the physical model label. ENTTEC mode times out on
+this device. Do not replace the virtual COM driver with a libusb driver: this
+application uses the normal serial device for both models.
 
 Commission with a representative fixture at low brightness and UV off:
 
@@ -130,8 +136,8 @@ Commission with a representative fixture at low brightness and UV off:
 If a write or open times out, output disarms and cleanup blocks new connections.
 Wait for cleanup before retrying. A stuck driver or failed close can require
 service restart and cable/driver inspection. Frames-written counters confirm only
-host writes, not fixture delivery. These physical checks have not been performed
-as part of the software implementation.
+host writes, not fixture delivery. Full fixture and loss-behavior commissioning
+remains required; successful host writes alone do not complete these checks.
 
 ## Backup, restore, and update
 

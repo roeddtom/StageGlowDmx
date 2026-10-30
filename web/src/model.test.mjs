@@ -74,9 +74,11 @@ describe('configuration validation', () => {
     const config = patchedRig()
     delete config.output
     assert.deepEqual(validateConfig(config), [])
-    for (const serialPort of ['', 'COM3', '/dev/ttyUSB0', '/dev/ttyACM1', '/dev/serial/by-id/usb-ENTTEC_123-if00-port0']) {
-      config.output = { mode: 'enttec', serialPort }
-      assert.deepEqual(validateConfig(config), [])
+    for (const mode of ['enttec', 'eurolite-mk2']) {
+      for (const serialPort of ['', 'COM3', '/dev/ttyUSB0', '/dev/ttyACM1', '/dev/serial/by-id/usb-ENTTEC_123-if00-port0']) {
+        config.output = { mode, serialPort }
+        assert.deepEqual(validateConfig(config), [])
+      }
     }
     for (const output of [null, {}, { mode: 'raw', serialPort: '' }, { mode: 'enttec', serialPort: '/etc/passwd' },
       { mode: 'enttec', serialPort: '/dev/serial/by-id/..' }, { mode: 'enttec', serialPort: 'COM0' },

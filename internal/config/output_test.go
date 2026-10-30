@@ -8,10 +8,12 @@ import (
 
 func TestOutputSettingsAndLegacyBackups(t *testing.T) {
 	c := Defaults()
-	for _, path := range []string{"", "COM1", "COM23", "/dev/ttyUSB0", "/dev/ttyACM12", "/dev/serial/by-id/usb-ENTTEC_DMX_USB_PRO_123-if00-port0"} {
-		c.Output = Output{Mode: "enttec", SerialPort: path}
-		if err := c.Validate(); err != nil {
-			t.Fatal("valid output selection rejected", path, err)
+	for _, mode := range []string{"enttec", "eurolite-mk2"} {
+		for _, path := range []string{"", "COM1", "COM23", "/dev/ttyUSB0", "/dev/ttyACM12", "/dev/serial/by-id/usb-ENTTEC_DMX_USB_PRO_123-if00-port0"} {
+			c.Output = Output{Mode: mode, SerialPort: path}
+			if err := c.Validate(); err != nil {
+				t.Fatal("valid output selection rejected", mode, path, err)
+			}
 		}
 	}
 	for _, path := range []string{"COM0", "com1", "/etc/passwd", "/dev/serial/by-id/../ttyUSB0", "/dev/tty", "COM1\n", "/dev/serial/by-id/.."} {

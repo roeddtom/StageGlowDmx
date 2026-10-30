@@ -301,7 +301,7 @@ export function App() {
 
       <footer className="footer">
         <span>StageGlow local setup</span>
-        <span>{runtime ? (runtime.outputEnabled ? 'ENTTEC USB output' : 'Mood simulation') : 'Output state unknown'} | Art-Net disabled</span>
+        <span>{runtime ? (runtime.outputEnabled ? runtime.output.mode === 'eurolite-mk2' ? 'Eurolite MK2 USB output' : 'ENTTEC USB output' : 'Mood simulation') : 'Output state unknown'} | Art-Net disabled</span>
       </footer>
       {(saveError || notice) && (
         <div className={saveError ? 'toast error' : 'toast'} role="alert">

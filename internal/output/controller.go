@@ -40,9 +40,6 @@ type Controller struct {
 }
 
 func New(c config.Config, lighting *engine.Engine, open Opener) *Controller {
-	if open == nil {
-		open = OpenENTTEC
-	}
 	return &Controller{
 		cfg: c.Copy(), engine: lighting, open: open,
 		status: Status{Mode: c.Output.Mode, Port: c.Output.SerialPort, State: "disabled"},
@@ -80,7 +77,7 @@ func (c *Controller) State() (engine.State, Status) {
 	state := c.engine.State()
 	state.OutputEnabled = c.status.Enabled
 	if c.status.Enabled {
-		state.EngineStatus = "enttec"
+		state.EngineStatus = c.cfg.Output.Mode
 	}
 	return state, c.status
 }
@@ -98,8 +95,8 @@ func (c *Controller) Enable() error {
 	if c.retiring != nil {
 		return errors.New("previous USB operation is still cleaning up; do not reconnect or re-enable until cleanup finishes")
 	}
-	if c.cfg.Output.Mode != "enttec" || c.cfg.Output.SerialPort == "" {
-		return errors.New("select ENTTEC DMX USB PRO and its serial port; Art-Net output is not implemented")
+	if (c.cfg.Output.Mode != "enttec" && c.cfg.Output.Mode != "eurolite-mk2") || c.cfg.Output.SerialPort == "" {
+		return errors.New("select ENTTEC DMX USB PRO or Eurolite USB-DMX512 PRO MK2 and its serial port; Art-Net output is not implemented")
 	}
 	patched := false
 	for _, l := range c.cfg.Loadouts {
@@ -121,8 +118,15 @@ func (c *Controller) Enable() error {
 	result := make(chan opened)
 	openDone := make(chan error, 1)
 	portName := c.cfg.Output.SerialPort
+	open := c.open
+	if open == nil {
+		open = OpenENTTEC
+		if c.cfg.Output.Mode == "eurolite-mk2" {
+			open = OpenEuroliteMK2
+		}
+	}
 	go func() {
-		device, err := c.open(portName)
+		device, err := open(portName)
 		select {
 		case result <- opened{device, err}:
 			openDone <- nil

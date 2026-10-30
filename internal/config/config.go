@@ -258,8 +258,8 @@ func (c Config) Validate() error {
 	if c.Profiles == nil || c.Groups == nil || c.Loadouts == nil {
 		return invalid("profiles, groups and loadouts must be arrays, not null or missing")
 	}
-	if c.Output.Mode != "simulation" && c.Output.Mode != "enttec" && c.Output.Mode != "artnet" {
-		return invalid("output.mode must be simulation, enttec or artnet")
+	if c.Output.Mode != "simulation" && c.Output.Mode != "enttec" && c.Output.Mode != "eurolite-mk2" && c.Output.Mode != "artnet" {
+		return invalid("output.mode must be simulation, enttec, eurolite-mk2 or artnet")
 	}
 	if c.Output.SerialPort != "" && (!serialPath.MatchString(c.Output.SerialPort) ||
 		strings.HasSuffix(c.Output.SerialPort, "/.") || strings.HasSuffix(c.Output.SerialPort, "/..")) {

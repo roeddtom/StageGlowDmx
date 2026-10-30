@@ -3,7 +3,7 @@
 Local, mood-based stage lighting over Art-Net, operated from a touchscreen
 browser and hosted on a Raspberry Pi.
 
-**Current stage: mood generation and ENTTEC DMX USB PRO home output.**
+**Current stage: mood generation and ENTTEC / Eurolite MK2 USB home output.**
 USB hardware commissioning is still required. A full-screen Show grid is
 available; Art-Net is not implemented and the system still needs rehearsal
 and physical acceptance before live use.
@@ -99,15 +99,15 @@ lighting works without selecting an Atmosphere. Neither selection persists after
 restart. Deleting a selected mood or changing its type clears that layer and
 latches blackout; changing a Pause mood to Base clears its Pause assignment.
 
-## Test moods through ENTTEC USB
+## Test moods through USB
 
-Connect the original **ENTTEC DMX USB PRO** to the computer running the Go service
+Connect an original **ENTTEC DMX USB PRO** or **Eurolite USB-DMX512 PRO MK2** to the computer running the Go service
 and its DMX output to your fixtures. This is server-side serial output, not
 browser WebUSB; ENTTEC Open DMX USB is unsupported.
 
 1. Configure and simulate the same fixture profiles, loadout, and moods first.
    Verify each fixture manual's channel mode and safe fixed values.
-2. In Fixtures > Lighting output, select ENTTEC DMX USB PRO, refresh serial ports,
+2. In Fixtures > Lighting output, select the exact interface model, refresh serial ports,
    choose the correct device, and apply settings. Windows uses a port such as
    `COM3`; on the Pi prefer a stable `/dev/serial/by-id/` path.
 3. Wait for Saved, then explicitly enable USB output. The first frame is blacked
@@ -122,6 +122,14 @@ interface repeats DMX at its own configured refresh rate; the application does
 not modify its persistent timing settings. Check the device's rate when
 commissioning smooth fades. A protocol handshake and successful writes do not
 prove that fixtures received the intended output.
+
+**Eurolite MK2 is a separate output mode**, not an ENTTEC device. It uses
+250,000 baud and the same full-universe label-6 framing, but does not support the
+ENTTEC widget-parameter handshake used by our ENTTEC mode. Selecting ENTTEC for
+this interface causes an initialization timeout. The MK2's generic FTDI port
+name cannot identify its model: select it explicitly from its physical label.
+Its enabled status confirms serial writes only, not device or fixture feedback.
+The original Eurolite PRO (non-MK2) and Open DMX USB are not targeted.
 
 Saved output settings never auto-enable USB after restart. Exports omit the
 machine-local port and reset output mode to simulation; imports do the same.

@@ -8,7 +8,7 @@ The central idea is:
 
 > The browser edits settings and sends commands. The Go process owns lighting
 > state, calculates what the fixtures should do now, and optionally writes the
-> result to the ENTTEC USB PRO.
+> result to the selected ENTTEC USB PRO or Eurolite MK2 interface.
 
 Art-Net output is not implemented yet.
 
@@ -102,7 +102,8 @@ Some Go syntax in those few lines:
 - `New` is a naming convention, not a language-level constructor keyword.
 
 The two `nil` arguments above select defaults. The engine uses `time.Now` as its
-clock; the controller uses `OpenENTTEC` as its device opener. Tests can supply
+clock; the controller chooses `OpenENTTEC` or `OpenEuroliteMK2` from the saved
+output mode when enabling USB. Tests can supply
 different implementations.
 
 Startup does **not** enable USB output. The engine begins in blackout, with no
@@ -505,6 +506,14 @@ Initialization sends a read-only widget-parameters request, label 3.
 DMX output uses label 6 with 513 payload bytes: a zero start code followed by
 512 channel bytes. The interface handles DMX wire timing and repeats its buffered
 frame at its configured refresh rate.
+
+Eurolite USB-DMX512 PRO MK2 is selected separately as `eurolite-mk2`. Its UART
+runs at 250,000 baud rather than ENTTEC's 57,600, and it has no parameter-query
+handshake. `euroliteMK2` embeds `*enttec`, reusing the framed writer, bounded
+operations and cleanup, but supplies its own no-query initialization method.
+The controller still sends a profile-safe blackout as the first output frame.
+This is explicit model selection, not automatic detection or a fallback after
+an ENTTEC handshake fails.
 
 ## 8. Concurrency and fault boundaries
 
