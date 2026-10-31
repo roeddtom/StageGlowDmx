@@ -54,4 +54,17 @@ func TestMissingFrontendIsActionable(t *testing.T) {
 	if response.Code != 503 || !strings.Contains(response.Body.String(), "Build the web application") {
 		t.Fatalf("unexpected response: %d %q", response.Code, response.Body.String())
 	}
+
+}
+
+func TestManifestContentType(t *testing.T) {
+	handler := frontendAssets(fstest.MapFS{
+		"index.html":           {Data: []byte("<html>StageGlow</html>")},
+		"manifest.webmanifest": {Data: []byte(`{"name":"StageGlow"}`)},
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest("GET", "/manifest.webmanifest", nil))
+	if response.Code != 200 || response.Header().Get("Content-Type") != "application/manifest+json" {
+		t.Fatalf("manifest response: %d %v", response.Code, response.Header())
+	}
 }

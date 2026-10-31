@@ -50,6 +50,9 @@ func frontendAssets(assets fs.FS) http.Handler {
 			files.ServeHTTP(w, clone)
 			return
 		}
+		if path.Ext(name) == ".webmanifest" {
+			w.Header().Set("Content-Type", "application/manifest+json")
+		}
 		files.ServeHTTP(w, r)
 	})
 }

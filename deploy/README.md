@@ -21,7 +21,8 @@ the simplest setup.
 
 Reserve the Pi's address in the router. Keep a note of that address; local
 hostname resolution is not guaranteed on every phone. The app listens on port
-8080. Do not expose it through router port forwarding or to an untrusted network.
+80 with the supplied service (no port suffix needed). Do not expose it through
+router port forwarding or to an untrusted network.
 
 ## Build on Windows
 
@@ -77,7 +78,7 @@ mkdir -p ~/stageglow-install
 tar -xzf ~/stageglow-pi2.tar.gz -C ~/stageglow-install
 cd ~/stageglow-install
 sudo sh ./install.sh
-curl --fail http://localhost:8080/api/health
+curl --fail http://localhost/api/health
 ```
 
 The installer verifies checksums, creates the service account if needed, grants
@@ -87,7 +88,7 @@ keeps its binary as `/opt/stageglow/stageglow.previous`, and preserves state and
 any HTTPS service override. Only the immediately preceding binary is retained.
 Installation/restart never enables physical output.
 
-Open `http://<pi-address>:8080` from your controlling device. Import the downloaded
+Open `http://<pi-address>` from your controlling device. Import the downloaded
 backup using the app's settings import, and verify your patch, moods and Show
 layout before proceeding. In Fixtures > Lighting output, select **Eurolite
 USB-DMX512 PRO MK2** for that interface, not ENTTEC, and choose the Pi's serial
@@ -122,7 +123,7 @@ Create the service user only on the first installation. systemd creates and owns
 the writable state directory `/var/lib/stageglow`; the application directory
 remains read-only to the service.
 
-Open `http://<pi-address>:8080` from a phone or tablet on the same router. The
+Open `http://<pi-address>` from a phone or tablet on the same router. The
 page must report USB output disabled at startup. Verify it
 works after reboot and without the router's internet uplink.
 
@@ -130,10 +131,12 @@ For diagnosis:
 
 ```sh
 journalctl -u stageglow -n 100 --no-pager
-curl http://localhost:8080/api/health
+curl http://localhost/api/health
 ```
 
-If a host firewall is enabled, allow TCP 8080 only from the trusted show subnet.
+If a host firewall is enabled, allow TCP 80 only from the trusted show subnet.
+The service grants only `CAP_NET_BIND_SERVICE` to bind port 80 without running
+as root. Direct command-line runs still default to port 8080.
 Art-Net UDP firewall rules are not needed for this release.
 
 ## Local HTTPS for browser microphone
@@ -186,7 +189,7 @@ In the editor, add the following override for `ExecStart`:
 ```ini
 [Service]
 ExecStart=
-ExecStart=/opt/stageglow/stageglow -listen :8443 -data /var/lib/stageglow -tls-cert /etc/stageglow/tls/stageglow.pem -tls-key /etc/stageglow/tls/stageglow-key.pem
+ExecStart=/opt/stageglow/stageglow -listen :8443 -http-listen :80 -data /var/lib/stageglow -tls-cert /etc/stageglow/tls/stageglow.pem -tls-key /etc/stageglow/tls/stageglow-key.pem
 ```
 
 Save, then run `sudo systemctl restart stageglow` and visit
@@ -202,9 +205,37 @@ Mic is opt-in in Show and turns off on exit, page hiding or connection loss.
 Last BPM remains active when detection stops.
 The Signal light indicates browser microphone level; Beat flashes for detected
 attacks, not a generated metronome. The Pi does not need an audio input for this.
-When using HTTPS, the HTTP listener on 8080 is replaced, not kept alongside it.
+With `-http-listen :80`, HTTP and HTTPS run simultaneously using one lighting
+engine and configuration. HTTP is not redirected: devices without certificate
+trust can use normal controls at `http://<pi-address>`, without microphone access.
+Omit `-http-listen` for HTTPS only; the flag requires both TLS flags.
+Both addresses allow control without authentication on the trusted LAN.
+Use only one browser for configuration edits; runtime commands from either
+address affect the same lights. Microphone follow should be enabled on one device
+only to avoid competing BPM updates.
 Use `curl --cacert <path-to-rootCA.pem> https://<pi-address>:8443/api/health`
 from a computer holding the public root certificate for HTTPS health checks.
+
+## Install StageGlow on the home screen
+
+Open the **trusted HTTPS** address, then use Chrome/Edge's browser menu
+**Install app** or **Add to home screen**. On iPhone/iPad, use Safari's Share
+menu > **Add to Home Screen**. Names and installation availability vary by
+browser. The app includes its own home-screen icons and opens in a standalone
+window where supported. HTTP on the Pi is for ordinary browser controls; use
+HTTPS for installation and microphone access.
+
+The installed app still connects to the Pi: it is not a separate lighting
+engine and cannot operate when disconnected. There is deliberately no service
+worker caching configuration or commands, so reconnecting never replays stale
+actions. Launch starts on the normal setup page; entering Show, enabling USB
+and microphone use remain deliberate. Existing trusted certificates continue
+to work after installing the updated binary.
+
+When upgrading an already-HTTPS Pi, the installer preserves its override.
+Edit it with `sudo systemctl edit stageglow` and add `-http-listen :80` to its
+`ExecStart` line, then restart the service. The updated base service provides
+the capability needed for port 80.
 
 ## USB setup and commissioning
 

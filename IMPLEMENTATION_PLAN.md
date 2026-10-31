@@ -90,6 +90,12 @@ and repeatable installer for 32-bit ARMv7 Raspberry Pi OS. The deployment guide
 covers transferring the bundle, importing the working rig, choosing the Pi's
 serial port, and trusted HTTPS for browser microphone testing. This preparation
 does not replace physical Pi acceptance.
+Home-screen installation is supported by a web app manifest and Android/iOS
+icons, without offline command or configuration caching. Optional simultaneous
+HTTP/HTTPS listeners share one controller and configuration. The Pi service
+uses HTTP port 80 with only the low-port binding capability; HTTPS stays on
+8443 in the documented setup. Browser microphone and PWA installation still
+require trusted HTTPS.
 
 ## Goal and agreed scope
 

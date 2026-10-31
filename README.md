@@ -272,6 +272,21 @@ interface and Linux serial port separately. Phone/tablet microphone access
 requires the guide's trusted HTTPS setup.
 The Pi needs no Go/Node.js runtime and no internet connection to serve the app.
 
+The Pi service uses HTTP port 80 (`http://<pi-address>`). With TLS configured,
+add `-http-listen :80` alongside `-listen :8443` to serve both protocols from
+the same engine. HTTP controls do not need a trusted certificate; browser
+microphone access and app installation use HTTPS.
+
+### Home-screen app
+
+StageGlow includes an installable web app manifest and home-screen icons.
+From a trusted HTTPS address, use the browser's **Install app / Add to home
+screen** menu (Safari: Share > Add to Home Screen). It opens in a standalone
+window on supported devices. Installation does not bypass microphone permissions
+or certificate trust, and still needs a live connection to the Pi. No commands
+or rig data are cached for offline replay. Use only one microphone follower
+and one configuration editor at a time, even when devices use different URLs.
+
 ## Plan
 
 For a code-oriented introduction, see [program flow and Go fundamentals](PROGRAM_FLOW.md).
