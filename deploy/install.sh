@@ -31,6 +31,16 @@ install -d -o root -g root -m 755 /opt/stageglow
 
 if [ -f /etc/systemd/system/stageglow.service ]; then
     systemctl stop stageglow
+    backup="/var/backups/stageglow/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    install -d -o root -g root -m 700 "$backup"
+    if [ -d /var/lib/stageglow ]; then
+        cp -a /var/lib/stageglow "$backup/state"
+    fi
+    cp -a /etc/systemd/system/stageglow.service "$backup/stageglow.service"
+    if [ -d /etc/systemd/system/stageglow.service.d ]; then
+        cp -a /etc/systemd/system/stageglow.service.d "$backup/overrides"
+    fi
+    echo "Pre-update backup: $backup"
 fi
 if [ -f /opt/stageglow/stageglow ]; then
     install -o root -g root -m 755 /opt/stageglow/stageglow /opt/stageglow/stageglow.previous

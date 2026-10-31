@@ -315,6 +315,38 @@ remains required; successful host writes alone do not complete these checks.
 
 ## Backup, restore, and update
 
+### One-command upload and update from Windows
+
+With your SSH key installed on the Pi, run from the repository root:
+
+```powershell
+.\scripts\update-pi.ps1 -PiAddress 192.168.1.145
+```
+
+It uses the existing `build\stageglow-pi2.tar.gz` and the key
+`$env:USERPROFILE\.ssh\stageglow_pi`, with login `stageglow`.
+For other setups, pass `-User`, `-IdentityFile` or `-Bundle`.
+Rebuild first after source changes:
+
+```powershell
+.\scripts\build.ps1 -Target pi2 -SkipInstall
+.\scripts\update-pi.ps1 -PiAddress 192.168.1.145
+```
+
+Black out and disable USB, export a backup, then type **UPDATE** when asked.
+SSH/sudo passwords are entered directly in your terminal, never saved by the
+script. The bundle is uploaded to a unique directory and checksums are verified
+before installation. The installer stops the service, backs up configuration
+and service files in `/var/backups/stageglow`, keeps the previous executable,
+and starts the new version. Existing settings, certificates and HTTPS overrides
+are preserved; USB remains disabled at startup. Backups are not automatically
+pruned, so check SD-card space during repeated updates.
+
+Use `-UploadOnly` to upload/verify without restarting; it prints the later
+installation command. After updating, refresh or reopen the browser/PWA.
+This helper does not change listener settings in an existing HTTPS override:
+add `-http-listen :80` there once if it still serves HTTPS only.
+
 Use the app's configuration export and store a copy away from the Pi. Imports
 are validated before replacing configuration. Keep a backup before updating the
 application; a future release may add configuration schema migrations.
