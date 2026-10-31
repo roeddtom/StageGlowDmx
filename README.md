@@ -286,6 +286,10 @@ window on supported devices. Installation does not bypass microphone permissions
 or certificate trust, and still needs a live connection to the Pi. No commands
 or rig data are cached for offline replay. Use only one microphone follower
 and one configuration editor at a time, even when devices use different URLs.
+Opening StageGlow starts in Show mode when the saved configuration contains
+at least one mood; an empty setup opens the editor. Use **Exit show** to edit.
+This does not select a mood, release blackout, enable USB, or start microphone
+capture. Reopening a browser does not change lighting already running on the Pi.
 
 ## Plan
 

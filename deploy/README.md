@@ -228,8 +228,9 @@ HTTPS for installation and microphone access.
 The installed app still connects to the Pi: it is not a separate lighting
 engine and cannot operate when disconnected. There is deliberately no service
 worker caching configuration or commands, so reconnecting never replays stale
-actions. Launch starts on the normal setup page; entering Show, enabling USB
-and microphone use remain deliberate. Existing trusted certificates continue
+actions. Launch opens Show when at least one saved mood exists, otherwise the
+setup page. Use Exit show to edit. Opening Show does not select a mood, release
+blackout, enable USB or start the microphone. Existing trusted certificates continue
 to work after installing the updated binary.
 
 When upgrading an already-HTTPS Pi, the installer preserves its override.

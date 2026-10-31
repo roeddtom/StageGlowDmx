@@ -85,6 +85,7 @@ export function App() {
       serverBaselineRef.current = loaded
       savedVersionRef.current = versionRef.current
       setConfig(loaded)
+      setPerforming((loaded.moods ?? []).length > 0)
       setRuntime(state)
       setBackendConnected(true)
     }).catch((error: unknown) => {
