@@ -57,6 +57,7 @@ export function App() {
   const [editVersion, setEditVersion] = useState(0)
   const [commandBusy, setCommandBusy] = useState(false)
   const commandVersion = useRef(0)
+  const showEnableAttempted = useRef(false)
   const configRef = useRef<Config | null>(null)
   const versionRef = useRef(0)
   const savedVersionRef = useRef(0)
@@ -240,6 +241,16 @@ export function App() {
       setCommandBusy(false)
     }
   }
+
+  useEffect(() => {
+    if (!performing) { showEnableAttempted.current = false; return }
+    if (showEnableAttempted.current) return
+    showEnableAttempted.current = true
+    if (!config || !runtime || !backendConnected || saveState !== 'saved' || commandBusy ||
+      runtime.outputEnabled || runtime.output.cleanupPending || runtime.output.state === 'fault' ||
+      !['enttec', 'eurolite-mk2'].includes(config.output?.mode) || !config.output.serialPort) return
+    void enableOutput(true)
+  }, [performing, config, runtime, backendConnected, saveState, commandBusy])
 
   if (!config) {
     return (

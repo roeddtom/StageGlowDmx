@@ -51,7 +51,7 @@ export function Output({ config, runtime, ready, busy, onUpdate, onEnable, onNot
         <div className="button-row"><button className="button" type="button" disabled={listing} onClick={() => void refresh()}>{listing ? 'Scanning...' : 'Refresh serial ports'}</button><button className="button primary" type="submit">Apply output settings</button></div>
       </fieldset>
     </form>
-    <p className="subtle">Disable output before editing the patch or port. Backups exclude machine-local output settings; imports return to simulation. Saved settings never auto-enable output.</p>
+    <p className="subtle">Disable output before editing the patch or port. Backups exclude machine-local output settings; imports return to simulation. Entering Show automatically enables a configured USB interface in blackout. Faults require an explicit retry here.</p>
     <div className="button-row">
       <button className="button primary" disabled={!ready || dirty || busy || !output || output.enabled || output.cleanupPending || !['enttec', 'eurolite-mk2'].includes(config.output?.mode) || !config.output.serialPort} onClick={() => {
         const model = config.output.mode === 'eurolite-mk2' ? 'Eurolite USB-DMX512 PRO MK2' : 'ENTTEC DMX USB PRO'

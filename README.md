@@ -209,8 +209,9 @@ of stopping output available. See the [commissioning checklist](deploy/README.md
    mode, master brightness, selected Base/Atmosphere, and USB enablement do not persist
    across process restart.
 
-Entering Show never enables USB or releases blackout. Enable the interface on
-Fixtures first for real output; otherwise Show controls the simulation. A USB
+Entering Show enables a saved USB interface with a configured port once, in
+blackout. Simulation-only settings stay simulated. Already-enabled output is
+left unchanged; failed attempts are not automatically retried. A USB
 fault disables normal performance actions until addressed outside Show.
 Connection loss shows unknown output state and disables mood/tempo controls;
 commands are not queued for replay. Server lighting continues independently of
@@ -288,7 +289,7 @@ or rig data are cached for offline replay. Use only one microphone follower
 and one configuration editor at a time, even when devices use different URLs.
 Opening StageGlow starts in Show mode when the saved configuration contains
 at least one mood; an empty setup opens the editor. Use **Exit show** to edit.
-This does not select a mood, release blackout, enable USB, or start microphone
+This does not select a mood, release blackout, or start microphone
 capture. Reopening a browser does not change lighting already running on the Pi.
 
 ## Plan

@@ -70,7 +70,7 @@ export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'con
     </section>
     <section className="panel">
       <h2>Before performing</h2>
-      <p>Enable USB deliberately on Fixtures first if you want real lights; entering Show never enables hardware or releases blackout. Simulation remains available without the interface.</p>
+      <p>Entering Show automatically enables the configured USB interface in blackout. Verify fixture channels and safe values first. Already-enabled output is left unchanged; failures require an explicit retry on Fixtures. Simulation-only settings remain simulation.</p>
       <p>Base buttons change static fallback lighting; Atmosphere buttons change the atmosphere selection. Both can be selected at once in any grid position. No base clears the fallback. Mood, Base and Pause buttons immediately resume lighting from blackout, without another tap or confirmation. Blackout can also be toggled off to restore the current combination.</p>
       <p className="subtle">Show mode hides configuration and navigation. Leaving requires confirmation and does not stop output. Browser fullscreen is optional. A disconnected browser does not stop the server; output may continue.</p>
     </section>

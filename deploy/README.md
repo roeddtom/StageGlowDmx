@@ -230,7 +230,10 @@ engine and cannot operate when disconnected. There is deliberately no service
 worker caching configuration or commands, so reconnecting never replays stale
 actions. Launch opens Show when at least one saved mood exists, otherwise the
 setup page. Use Exit show to edit. Opening Show does not select a mood, release
-blackout, enable USB or start the microphone. Existing trusted certificates continue
+blackout or start the microphone. It automatically enables a configured USB
+interface once in blackout, unless already enabled or faulted. No automatic
+retry occurs after failure; exit Show and retry explicitly on Fixtures.
+Simulation-only settings stay simulated. Existing trusted certificates continue
 to work after installing the updated binary.
 
 When upgrading an already-HTTPS Pi, the installer preserves its override.
