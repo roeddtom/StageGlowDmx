@@ -221,8 +221,12 @@ from a computer holding the public root certificate for HTTPS health checks.
 Open the **trusted HTTPS** address, then use Chrome/Edge's browser menu
 **Install app** or **Add to home screen**. On iPhone/iPad, use Safari's Share
 menu > **Add to Home Screen**. Names and installation availability vary by
-browser. The app includes its own home-screen icons and opens in a standalone
-window where supported. HTTP on the Pi is for ordinary browser controls; use
+browser. The app includes its own home-screen icons and requests fullscreen on
+launch, including automatic Show startup. This applies to the whole installed
+app, including editing. Unsupported platforms fall back to a standalone window
+or browser; normal browser tabs still use the Show Fullscreen button. After an
+update, an existing installation may need reinstalling to adopt the new display
+mode. HTTP on the Pi is for ordinary browser controls; use
 HTTPS for installation and microphone access.
 
 The installed app still connects to the Pi: it is not a separate lighting

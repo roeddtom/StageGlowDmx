@@ -5,7 +5,7 @@
   "description": "Local mood-based stage lighting controls",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#0c1010",
   "theme_color": "#111313",
   "icons": [
