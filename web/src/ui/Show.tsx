@@ -93,7 +93,8 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
   const pause = config.moods.find((mood) => mood.id === layout.pauseMoodId)
   const hardware = runtime?.outputEnabled === true
   const fault = runtime?.output.state === 'fault'
-  const canPlay = ready && !busy && !fault
+  const playable = ready && !fault
+  const canPlay = playable && !busy
   const tap = () => {
     if (!runtime) return
     setManualVersion((version) => version + 1)
@@ -124,7 +125,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
         }}>Exit show</button>
       </div>
       <div className="show-levels">
-        <button className="button show-no-base" disabled={!canPlay || !base} onClick={() => void onCommand({ action: 'clear-base' })}>No base</button>
+        <button className="button show-no-base" data-command-pending={busy && playable && !!base} disabled={!canPlay || !base} onClick={() => void onCommand({ action: 'clear-base' })}>No base</button>
         <MasterDimmer value={runtime?.master ?? 1} available={ready && !!runtime && !fault} busy={busy} onCommand={onCommand} />
       </div>
       <MicrophoneTempo bpm={config.bpm} available={ready && !!runtime && !fault} manualVersion={manualVersion} onTempo={(bpm) => onUpdate({ ...config, bpm })} />
@@ -135,7 +136,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
         const mood = config.moods.find((item) => item.id === id)
         const isBase = mood?.type === 'base'
         const selected = Boolean(mood && (isBase ? runtime?.activeBaseMoodId : runtime?.activeMoodId) === mood.id)
-        return <button key={index} className={`show-mood ${isBase ? 'show-base' : ''} ${selected && !runtime?.blackout ? 'is-selected' : ''}`} disabled={!canPlay || !mood} aria-pressed={selected && !runtime?.blackout} onClick={() => { if (mood) void onCommand({ action: 'play', moodId: mood.id }) }}>
+        return <button key={index} className={`show-mood ${isBase ? 'show-base' : ''} ${selected && !runtime?.blackout ? 'is-selected' : ''}`} data-command-pending={busy && playable && !!mood} disabled={!canPlay || !mood} aria-pressed={selected && !runtime?.blackout} onClick={() => { if (mood) void onCommand({ action: 'play', moodId: mood.id }) }}>
           <span className="show-slot-number">{index + 1}{isBase ? ' / BASE' : ''}</span>
           <strong>{mood?.name ?? 'Unassigned'}</strong>
           <span className="show-slot-state">{selected ? (runtime?.blackout ? 'Tap to resume' : 'PLAYING') : mood ? isBase ? 'Static fallback' : `${mood.beatsPerChange} beats` : 'Assign in Show setup'}</span>
@@ -144,8 +145,8 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
       })}
     </div>
     <div className="show-fixed" aria-label="Fixed performance buttons">
-      <button className={`show-action show-blackout ${runtime?.blackout ? 'is-selected' : ''}`} disabled={busy || Boolean(runtime?.blackout && (!canPlay || (!active && !base)))} aria-pressed={runtime?.blackout ?? false} onClick={() => void onCommand({ action: 'blackout', enabled: !runtime || !runtime.blackout })}><strong>Blackout</strong><span>{!runtime ? 'State unknown' : runtime.blackout ? active || base ? 'ON / tap to restore' : 'ON / select a mood' : 'OFF / tap to black out'}</span></button>
-      <button className={`show-action show-pause ${pause && runtime?.activeMoodId === pause.id && !runtime?.blackout ? 'is-selected' : ''}`} disabled={!canPlay || !pause} aria-pressed={Boolean(pause && runtime?.activeMoodId === pause.id && !runtime?.blackout)} onClick={() => { if (pause) void onCommand({ action: 'play', moodId: pause.id }) }}><strong>Pause</strong><span>{pause ? runtime?.activeMoodId === pause.id ? runtime.blackout ? 'Tap to resume' : 'PLAYING' : 'Low light' : 'Not assigned'}</span></button>
+      <button className={`show-action show-blackout ${runtime?.blackout ? 'is-selected' : ''}`} data-command-pending={busy && (!runtime?.blackout || (playable && !!(active || base)))} disabled={busy || Boolean(runtime?.blackout && (!canPlay || (!active && !base)))} aria-pressed={runtime?.blackout ?? false} onClick={() => void onCommand({ action: 'blackout', enabled: !runtime || !runtime.blackout })}><strong>Blackout</strong><span>{!runtime ? 'State unknown' : runtime.blackout ? active || base ? 'ON / tap to restore' : 'ON / select a mood' : 'OFF / tap to black out'}</span></button>
+      <button className={`show-action show-pause ${pause && runtime?.activeMoodId === pause.id && !runtime?.blackout ? 'is-selected' : ''}`} data-command-pending={busy && playable && !!pause} disabled={!canPlay || !pause} aria-pressed={Boolean(pause && runtime?.activeMoodId === pause.id && !runtime?.blackout)} onClick={() => { if (pause) void onCommand({ action: 'play', moodId: pause.id }) }}><strong>Pause</strong><span>{pause ? runtime?.activeMoodId === pause.id ? runtime.blackout ? 'Tap to resume' : 'PLAYING' : 'Low light' : 'Not assigned'}</span></button>
       <button className="show-action show-tap" disabled={!runtime || fault} onClick={tap}><strong>Tap tempo</strong><span>{tapHint ? 'Tap again' : `${config.bpm} BPM`}</span></button>
     </div>
   </main>

@@ -265,6 +265,8 @@ input::placeholder { color: #74807d; }
 .show-blackout { background: #321616; border-color: #80504b; }
 .show-blackout.is-selected { background: #d51f25; border-color: #ffaba7; box-shadow: inset 0 0 0 2px #ffaba7; opacity: 1; }
 .show-screen.is-blacked-out button:not(.show-blackout):not(:disabled) { opacity: .72; }
+.show-screen button[data-command-pending="true"]:disabled { opacity: 1; cursor: default; }
+.show-screen.is-blacked-out button[data-command-pending="true"]:not(.show-blackout):disabled { opacity: .72; }
 .show-pause { background: #3c301b; border-color: #a48b56; }
 .show-pause.is-selected { border-color: #ffdd95; box-shadow: inset 0 0 0 2px #ffdd95; }
 .show-tap { background: #1d3045; border-color: #668fbd; }
