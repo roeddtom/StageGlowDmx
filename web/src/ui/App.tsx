@@ -464,7 +464,10 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
 
     <Panel id="fixtures-profiles" kicker="01 / CHANNEL MAPS" title="Fixture profiles" defaultCollapsed={config.profiles.length > 0}
       summary={`${config.profiles.length} profile${config.profiles.length === 1 ? '' : 's'}`}
-      help={<><p>Use your fixture manual to confirm every channel and safe value.</p><p><strong>Templates are suggestions, not fixture maps.</strong> Confirm channel order, shutter behavior, and safe values against the fixture manual before use.</p></>}>
+      action={<button className="button primary" onClick={() => {
+        setProfileDraft(makeTemplate('Custom fixture', ['white'])); setProfileMessage('')
+      }}>New custom profile</button>}
+      help={<><p>Create a custom profile without a template, or expand this section to choose a template such as White spot (1ch). Set the channel count and map every function using your fixture manual.</p><p><strong>Templates are suggestions, not fixture maps.</strong> Confirm channel order, shutter behavior, and safe values against the fixture manual before use.</p></>}>
       <div className="template-actions">
         <span className="tiny-label">START A TEMPLATE</span>
         <div className="button-row">{templates.map((template) => <button className="button small" key={template.name} onClick={() => {
@@ -472,16 +475,17 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
         }}>{template.name}</button>)}</div>
       </div>
       <div className="profile-grid">
-        {config.profiles.length === 0 && <div className="empty-state">No profiles saved. Choose a template to begin.</div>}
+        {config.profiles.length === 0 && <div className="empty-state">No profiles saved. Create a custom profile or choose a template to begin.</div>}
         {config.profiles.map((profile) => <article className="profile-card" key={profile.id}>
           <div className="card-title-row"><div><h3>{profile.name}</h3><span className="subtle">{profile.footprint} channels</span></div><span className="profile-tag">{profile.channels.some((channel) => channel.kind === 'red') ? 'RGB PROFILE' : 'WHITE PROFILE'}</span></div>
           <div className="channel-chips">{profile.channels.slice().sort((a, b) => a.offset - b.offset).map((channel) => <span className={`channel-chip ${channel.kind}`} key={channel.offset}><b>{channel.offset}</b> {channel.kind === 'fixed' ? `fixed ${channel.value}` : channel.kind}</span>)}</div>
           <div className="card-actions"><button className="text-button" onClick={() => { setProfileDraft(structuredClone(profile)); setProfileMessage('') }}>Edit map</button><button className="text-button danger-text" onClick={() => deleteProfile(profile)}>Delete</button></div>
         </article>)}
       </div>
-      {profileDraft && <div className="editor-box">
-        <div className="editor-title"><div><div className="section-kicker">PROFILE EDITOR</div><h3>{config.profiles.some((item) => item.id === profileDraft.id) ? 'Edit profile' : 'New template profile'}</h3></div><button className="text-button" onClick={() => setProfileDraft(null)}>Cancel</button></div>
-        {!config.profiles.some((item) => item.id === profileDraft.id) && <div className="template-warning"><strong>Templates are suggestions, not fixture maps.</strong> Confirm channel order, shutter behavior, and safe values against the fixture manual before use.</div>}
+    </Panel>
+      {profileDraft && <div className="panel editor-box">
+        <div className="editor-title"><div><div className="section-kicker">PROFILE EDITOR</div><h3>{config.profiles.some((item) => item.id === profileDraft.id) ? 'Edit profile' : 'New fixture profile'}</h3></div><button className="text-button" onClick={() => setProfileDraft(null)}>Cancel</button></div>
+        {!config.profiles.some((item) => item.id === profileDraft.id) && <div className="template-warning">Confirm channel order, shutter behavior, and safe values against the fixture manual before use. For a one-channel spot, map its intensity channel as <strong>white</strong>.</div>}
         <div className="form-grid two">
           {input('Profile name', profileDraft.name, (name) => setProfileDraft({ ...profileDraft, name }))}
           {input('Footprint (channels)', profileDraft.footprint, (raw) => {
@@ -491,7 +495,7 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
               while (channels.length < footprint) channels.push({ offset: channels.length, kind: 'fixed', value: 0 })
               setProfileDraft({ ...profileDraft, footprint, channels: channels.slice(0, footprint).map((channel, i) => ({ ...channel, offset: channel.offset < footprint ? channel.offset : i })) })
             } else setProfileDraft({ ...profileDraft, footprint })
-          }, { type: 'number', min: 3, max: 512 })}
+          }, { type: 'number', min: 1, max: 512 })}
         </div>
         <div className="channel-editor">
           <div className="channel-editor-head"><span>OFFSET</span><span>FUNCTION</span><span>SAFE VALUE</span><span>BLACKOUT VALUE</span></div>
@@ -517,7 +521,6 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
         {profileMessage && <p className="inline-error">{profileMessage}</p>}
         <div className="editor-footer"><button className="button primary" onClick={saveProfile}>Apply profile</button><span>Changes are staged until applied and then autosaved.</span></div>
       </div>}
-    </Panel>
 
     <div className="two-column">
       <Panel id="fixtures-groups" kicker="02 / REUSABLE IDENTITIES" title="Fixture groups" help="Reusable groups targeted by your moods, such as Front, Back or Floor. Moods set colour and intensity per group."

@@ -156,6 +156,12 @@ For single-colour LED spots with just one intensity channel, use the
 master fader. If the spot has extra channels (strobe, modes), add them as
 fixed channels at their no-effect values.
 
+On **Fixtures**, expand **Fixture profiles** to see the templates. To build
+your own map instead, click **New custom profile**, which remains visible even
+when the section is collapsed. It starts with one white intensity channel;
+set the channel count (1-512), name and functions to match your fixture manual,
+then click **Apply profile**. Assign the saved profile to a fixture in your loadout.
+
 Strobe and built-in programs remain separate fixed profile values, outside mood
 control, with zero blackout values. Verify these no-effect defaults against
 your fixture's manual/revision before enabling USB. The Barwash H001 map is
