@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { emptyShow, makeMood, tapBPM, type Config, type RuntimeState } from '../model'
 import type { SimulationCommand } from './Moods'
 import { MicrophoneTempo } from './MicrophoneTempo'
+import { Heading, Help, Panel } from './Panel'
 
 type Props = {
   config: Config
@@ -43,12 +44,10 @@ export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'con
   const moods = config.moods ?? []
   const options = <><option value="">Unassigned</option>{moods.map((mood) => <option key={mood.id} value={mood.id}>{mood.type === 'base' ? '[BASE] ' : ''}{mood.name}</option>)}</>
   return <div>
-    <div className="section-heading">
-      <div><div className="section-kicker">PERFORMANCE LAYOUT</div><h1>Show</h1><p>Choose your mood buttons, then enter a screen-filling grid. Blackout, Pause and Tap Tempo always stay in the same bottom row.</p></div>
-      <button className="button primary" disabled={!ready} onClick={onEnter}>Enter show mode</button>
-    </div>
-    <section className="panel">
-      <div className="panel-heading"><div><h2>Show buttons</h2><p>Assignments autosave and travel with backups. Unassigned buttons stay disabled. You can repeat a mood in more than one slot.</p></div></div>
+    <Heading page kicker="PERFORMANCE LAYOUT" title="Show" help="Choose your mood buttons, then enter a screen-filling grid. Blackout, Pause and Tap Tempo always stay in the same bottom row."
+      action={<button className="button primary" disabled={!ready} onClick={onEnter}>Enter show mode</button>} />
+    <Panel id="show-buttons" title="Show buttons" summary={`${layout.slots.filter(Boolean).length} of ${layout.slots.length} assigned`}
+      help="Assignments autosave and travel with backups. Unassigned buttons stay disabled. You can repeat a mood in more than one slot.">
       <div className="form-grid two">
         <label className="field">Number of mood buttons<select value={layout.slots.length} onChange={(event) => {
           const count = Number(event.target.value)
@@ -57,7 +56,7 @@ export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'con
         }}>{[8, 9, 10, 11, 12].map((count) => <option key={count} value={count}>{count}</option>)}</select></label>
         <label className="field">Low-light Pause mood<select value={layout.pauseMoodId} onChange={(event) => onUpdate({ ...config, show: { ...layout, pauseMoodId: event.target.value } })}><option value="">Unassigned</option>{moods.filter((mood) => mood.type !== 'base').map((mood) => <option key={mood.id} value={mood.id}>{mood.name}</option>)}</select></label>
       </div>
-      <p className="subtle">Pause is an Atmosphere: it keeps the selected Base for excluded groups. Exclude Front from Pause to retain Base front lighting. Included groups override the Base. Choose gentle static lighting with UV off.</p>
+      <Help topic="About Pause">Pause is an Atmosphere: it keeps the selected Base for excluded groups. Exclude Front from Pause to retain Base front lighting. Included groups override the Base. Choose gentle static lighting with UV off.</Help>
       {!layout.pauseMoodId && <button className="button" disabled={!config.groups.length} onClick={() => {
         const mood = makeMood(config.groups)
         mood.name = 'Low-light pause'
@@ -67,13 +66,12 @@ export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'con
       <div className="show-assignments form-grid two">
         {layout.slots.map((id, index) => <label className="field" key={index}>Button {index + 1}<select value={id} onChange={(event) => onUpdate({ ...config, show: { ...layout, slots: layout.slots.map((item, i) => i === index ? event.target.value : item) } })}>{options}</select></label>)}
       </div>
-    </section>
-    <section className="panel">
-      <h2>Before performing</h2>
-      <p>Entering Show automatically enables the configured USB interface in blackout. Verify fixture channels and safe values first. Already-enabled output is left unchanged; failures require an explicit retry on Fixtures. Simulation-only settings remain simulation.</p>
+    </Panel>
+    <Panel id="show-before" title="Before performing" defaultCollapsed summary="Show behaviour and safety notes">
+      <p>Entering Show automatically enables the configured USB interface in blackout. Verify fixture channels and safe values first. Already-enabled output is left unchanged; failures require an explicit retry on the Output page. Simulation-only settings remain simulation.</p>
       <p>Base buttons change static fallback lighting; Atmosphere buttons change the atmosphere selection. Both can be selected at once in any grid position. No base clears the fallback. Mood, Base and Pause buttons immediately resume lighting from blackout, without another tap or confirmation. Blackout can also be toggled off to restore the current combination.</p>
       <p className="subtle">Show mode hides configuration and navigation. Leaving requires confirmation and does not stop output. Browser fullscreen is optional. A disconnected browser does not stop the server; output may continue.</p>
-    </section>
+    </Panel>
   </div>
 }
 

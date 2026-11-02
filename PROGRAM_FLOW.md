@@ -16,7 +16,7 @@ Art-Net output is not implemented yet.
 
 ```text
 Browser: React + TypeScript
-  Fixtures / Moods / Show
+  Output / Fixtures / Moods / Show
            |
            | HTTP JSON requests and state polling
            v

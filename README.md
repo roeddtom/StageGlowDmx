@@ -43,6 +43,11 @@ Frontend tests use Node's built-in test runner.
 
 ## Create and simulate moods
 
+The setup pages are **Output** (USB interface, Art-Net and backups),
+**Fixtures**, **Moods** and **Show**. Sections can be collapsed by tapping their
+titles; the browser remembers which are open. Longer explanations sit behind
+the **?** buttons.
+
 1. Define profiles and groups, patch fixtures into a loadout, and select that
    loadout as active on the Fixtures page.
 2. Open Moods and create a starter or a new mood. New moods start at 80-100%
@@ -160,7 +165,7 @@ browser WebUSB; ENTTEC Open DMX USB is unsupported.
 
 1. Configure and simulate the same fixture profiles, loadout, and moods first.
    Verify each fixture manual's channel mode and safe fixed values.
-2. In Fixtures > Lighting output, select the exact interface model, refresh serial ports,
+2. On the Output page, select the exact interface model, refresh serial ports,
    choose the correct device, and apply settings. Windows uses a port such as
    `COM3`; on the Pi prefer a stable `/dev/serial/by-id/` path.
 3. Wait for Saved, then explicitly enable USB output. The first frame is blacked

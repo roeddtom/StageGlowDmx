@@ -90,7 +90,7 @@ Installation/restart never enables physical output.
 
 Open `http://<pi-address>` from your controlling device. Import the downloaded
 backup using the app's settings import, and verify your patch, moods and Show
-layout before proceeding. In Fixtures > Lighting output, select **Eurolite
+layout before proceeding. On the Output page, select **Eurolite
 USB-DMX512 PRO MK2** for that interface, not ENTTEC, and choose the Pi's serial
 device. Your Windows `COM5` is intentionally not restored.
 
@@ -236,7 +236,7 @@ actions. Launch opens Show when at least one saved mood exists, otherwise the
 setup page. Use Exit show to edit. Opening Show does not select a mood, release
 blackout or start the microphone. It automatically enables a configured USB
 interface once in blackout, unless already enabled or faulted. No automatic
-retry occurs after failure; exit Show and retry explicitly on Fixtures.
+retry occurs after failure; exit Show and retry explicitly on the Output page.
 Simulation-only settings stay simulated. Existing trusted certificates continue
 to work after installing the updated binary.
 
@@ -269,7 +269,7 @@ only that group to the service; do not make devices world-writable or run the
 service as root. The unit intentionally does not use `PrivateDevices=true`,
 which would hide the USB device. Close other lighting apps using the same port.
 
-In Fixtures > Lighting output, choose the exact interface model, refresh ports, select the stable
+On the Output page, choose the exact interface model, refresh ports, select the stable
 `/dev/serial/by-id/` entry, apply, and wait for Saved. Device listing does not
 identify the model; check the physical label. The read-only USB PRO handshake
 checks protocol compatibility, not brand identity. USB settings are stored only

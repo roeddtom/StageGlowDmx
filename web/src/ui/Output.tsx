@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { validateConfig, type Config, type RuntimeState } from '../model'
+import { Panel } from './Panel'
 
 type Props = {
   config: Config
@@ -33,8 +34,15 @@ export function Output({ config, runtime, ready, busy, onUpdate, onEnable, onNot
       onNotice(error instanceof Error ? error.message : 'Could not list serial ports.')
     } finally { setListing(false) }
   }
-  return <section className="panel output-panel">
-    <div className="panel-heading"><div><div className="section-kicker">HOME TESTING / ONE UNIVERSE</div><h2>Lighting output</h2><p>Supports ENTTEC DMX USB PRO and Eurolite USB-DMX512 PRO MK2, not Open DMX USB. Select the exact model; serial-port names do not identify it. Art-Net is not implemented. Ports belong to the server, not this browser.</p></div><span className="profile-tag">{output?.enabled ? 'USB ENABLED' : output?.state.toUpperCase() ?? 'UNKNOWN'}</span></div>
+  const modelHelp = <>
+    <p>Supports ENTTEC DMX USB PRO and Eurolite USB-DMX512 PRO MK2, not Open DMX USB. Select the exact model; serial-port names do not identify it. Ports belong to the server, not this browser.</p>
+    <p>Disable output before editing the patch or port. Backups exclude machine-local output settings; imports return to simulation. Entering Show automatically enables a configured USB interface in blackout. Faults require an explicit retry here.</p>
+    {config.output.mode === 'eurolite-mk2' && <p>Eurolite MK2 uses 250,000 baud and has no USB PRO handshake. An enabled status confirms serial writes only, not the device model or fixture response.</p>}
+    <p>Frame writes are not fixture acknowledgements. A USB fault, power loss, or server failure may leave the interface repeating its last frame. Browser loss does not stop lighting; use the fixture's physical controls if necessary.</p>
+  </>
+  return <Panel id="output-usb" className="output-panel" kicker="ONE UNIVERSE" title="USB output" help={modelHelp}
+    action={<span className="profile-tag">{output?.enabled ? 'USB ENABLED' : output?.state.toUpperCase() ?? 'UNKNOWN'}</span>}
+    summary={`${config.output.mode === 'simulation' ? 'Simulation only' : config.output.serialPort || 'No port'}`}>
     <form onSubmit={(event) => {
       event.preventDefault()
       const next = { ...config, output: draft }
@@ -51,18 +59,44 @@ export function Output({ config, runtime, ready, busy, onUpdate, onEnable, onNot
         <div className="button-row"><button className="button" type="button" disabled={listing} onClick={() => void refresh()}>{listing ? 'Scanning...' : 'Refresh serial ports'}</button><button className="button primary" type="submit">Apply output settings</button></div>
       </fieldset>
     </form>
-    <p className="subtle">Disable output before editing the patch or port. Backups exclude machine-local output settings; imports return to simulation. Entering Show automatically enables a configured USB interface in blackout. Faults require an explicit retry here.</p>
-    <div className="button-row">
+    <div className="button-row output-actions">
       <button className="button primary" disabled={!ready || dirty || busy || !output || output.enabled || output.cleanupPending || !['enttec', 'eurolite-mk2'].includes(config.output?.mode) || !config.output.serialPort} onClick={() => {
         const model = config.output.mode === 'eurolite-mk2' ? 'Eurolite USB-DMX512 PRO MK2' : 'ENTTEC DMX USB PRO'
         if (window.confirm(`Enable physical ${model} output? Verify the interface, fixture channel map and safe fixed values first. This sends a blackout frame; releasing blackout in Moods can turn on real lights.`)) void onEnable(true)
       }}>Enable USB output (blacked out)</button>
       <button className="button danger-button" disabled={busy} onClick={() => void onEnable(false)}>Black out & disable USB</button>
     </div>
-    {output && <p>Server: <strong>{output.state}</strong> | Frames written: {output.framesSent}{output.port && ` | ${output.port}`}</p>}
+    {output && <p className="subtle">Server: <strong>{output.state}</strong> | Frames written: {output.framesSent}{output.port && ` | ${output.port}`}</p>}
     {output?.cleanupPending && <p className="inline-error" role="alert">USB cleanup pending. Do not reconnect or re-enable until cleanup finishes. A stuck driver may require a service restart.</p>}
     {output?.error && <p className="inline-error" role="alert">{output.error} Check the cable, driver, permissions, and other apps using the port; retry explicitly after cleanup.</p>}
-    {config.output.mode === 'eurolite-mk2' && <p className="subtle">Eurolite MK2 uses 250,000 baud and has no USB PRO handshake. An enabled status confirms serial writes only, not the device model or fixture response.</p>}
-    <p className="subtle">Frame writes are not fixture acknowledgements. A USB fault, power loss, or server failure may leave the interface repeating its last frame. Browser loss does not stop lighting; use the fixture's physical controls if necessary.</p>
-  </section>
+  </Panel>
+}
+
+export function ArtNetSettings({ config, onUpdate, onNotice }: Pick<Props, 'config' | 'onUpdate' | 'onNotice'>) {
+  const current = () => ({ destinationIp: config.artNet.destinationIp, portAddress: String(config.artNet.portAddress) })
+  const [settings, setSettings] = useState(current)
+  const [dirty, setDirty] = useState(false)
+  useEffect(() => {
+    if (!dirty) setSettings({ destinationIp: config.artNet.destinationIp, portAddress: String(config.artNet.portAddress) })
+  }, [config.artNet, dirty])
+  const edit = (patch: Partial<typeof settings>) => { setSettings({ ...settings, ...patch }); setDirty(true) }
+  return <Panel id="output-artnet" className="settings-panel" kicker="FUTURE VENUE OUTPUT" title="Art-Net" defaultCollapsed
+    help="Stored for future venue output. No Art-Net packets are sent in this release. Use a unicast IPv4 address and confirm the Port-Address mapping with your Art-Net node."
+    action={<span className="disabled-chip">ART-NET DISABLED</span>}
+    summary={config.artNet.destinationIp || 'Not configured'}>
+    <form onSubmit={(event) => {
+      event.preventDefault()
+      const next = { ...config, artNet: { destinationIp: settings.destinationIp.trim(), portAddress: Number(settings.portAddress) } }
+      const errors = validateConfig(next)
+      if (errors.length) { onNotice(errors[0]); return }
+      onUpdate(next)
+      setDirty(false)
+    }}>
+      <div className="form-grid two">
+        <label className="field">Node IPv4 address<input inputMode="decimal" placeholder="Blank until configured" value={settings.destinationIp} onChange={(event) => edit({ destinationIp: event.target.value })} /></label>
+        <label className="field">Port-Address (0-32767)<input type="number" min="0" max="32767" value={settings.portAddress} onChange={(event) => edit({ portAddress: event.target.value })} /></label>
+      </div>
+      <div className="settings-footer"><span /><button className="button primary" type="submit">Apply Art-Net settings</button></div>
+    </form>
+  </Panel>
 }

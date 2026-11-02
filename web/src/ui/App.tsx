@@ -4,10 +4,12 @@ import {
   type ChannelKind, type Config, type Fixture, type Group, type Loadout, type Profile, type ProfileChannel, type RuntimeState,
 } from '../model'
 import { Moods, type SimulationCommand } from './Moods'
-import { Output } from './Output'
+import { ArtNetSettings, Output } from './Output'
+import { Heading, Help, Panel } from './Panel'
 import { Show, ShowSetup } from './Show'
 
-type Page = 'fixtures' | 'moods' | 'show'
+type Page = 'output' | 'fixtures' | 'moods' | 'show'
+const pageLabels: Record<Page, string> = { output: 'Output', fixtures: 'Fixtures', moods: 'Moods', show: 'Show' }
 
 class ApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -290,10 +292,10 @@ export function App() {
       </div>
 
       <nav className="main-nav" aria-label="Main navigation">
-        {(['fixtures', 'moods', 'show'] as Page[]).map((item) => (
+        {(['output', 'fixtures', 'moods', 'show'] as Page[]).map((item) => (
           <button key={item} className={page === item ? 'nav-item active' : 'nav-item'} onClick={() => setPage(item)}>
             <span className={`nav-mark ${item}`} aria-hidden="true" />
-            {item === 'fixtures' ? 'Fixtures' : item === 'moods' ? 'Moods' : 'Show'}
+            {pageLabels[item]}
           </button>
         ))}
         <div className="nav-spacer" />
@@ -301,14 +303,18 @@ export function App() {
       </nav>
 
       <main className="content">
-        <div hidden={page !== 'fixtures'}>
+        <div hidden={page !== 'output'}>
+          <SectionHeading kicker="CONNECTION" title="Output" description="Choose how StageGlow reaches your fixtures. USB output stays blacked out until you release it; entering Show enables a configured USB interface automatically. Backups exclude machine-local output settings." />
           <Output config={config} runtime={runtime} ready={saveState === 'saved' && backendConnected && runtime !== null} busy={commandBusy} onUpdate={updateConfig} onEnable={enableOutput} onNotice={setNotice} />
-          {runtime?.outputEnabled && <p className="inline-error">Patch editing is locked while USB output is enabled. Black out and disable USB above first.</p>}
+          <ArtNetSettings key={editorEpoch} config={config} onUpdate={updateConfig} onNotice={setNotice} />
+          <Backup saveState={saveState} onImported={applyImportedConfig} onNotice={setNotice} onConnection={setBackendConnected} />
+        </div>
+        <div hidden={page !== 'fixtures'}>
+          {runtime?.outputEnabled && <p className="inline-error">Patch editing is locked while USB output is enabled. Use Disable USB in the banner or on the Output page first.</p>}
           <fieldset className="patch-controls" disabled={!runtime || runtime.outputEnabled || commandBusy}><Fixtures key={editorEpoch} config={config} onUpdate={updateConfig} onNotice={setNotice} /></fieldset>
         </div>
         <div hidden={page !== 'moods'}><Moods key={editorEpoch} config={config} runtime={runtime} ready={saveState === 'saved' && backendConnected && runtime !== null} busy={commandBusy} onUpdate={updateConfig} onCommand={simulation} onNotice={setNotice} /></div>
         {page === 'show' && <ShowSetup config={config} ready={saveState === 'saved' && backendConnected && runtime !== null} onUpdate={updateConfig} onEnter={() => { setNotice(''); setPerforming(true) }} />}
-        <Backup saveState={saveState} onImported={applyImportedConfig} onNotice={setNotice} onConnection={setBackendConnected} />
       </main>
 
       <footer className="footer">
@@ -337,10 +343,7 @@ function Brand() {
 }
 
 function SectionHeading({ kicker, title, description, action }: { kicker: string; title: string; description: string; action?: React.ReactNode }) {
-  return <div className="section-heading">
-    <div><div className="section-kicker">{kicker}</div><h1>{title}</h1><p>{description}</p></div>
-    {action}
-  </div>
+  return <Heading page kicker={kicker} title={title} help={description} action={action} />
 }
 
 function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (next: Config) => void; onNotice: (message: string) => void }) {
@@ -353,11 +356,6 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
   const [fixtureDraft, setFixtureDraft] = useState<Fixture | null>(null)
   const [profileDraft, setProfileDraft] = useState<Profile | null>(null)
   const [profileMessage, setProfileMessage] = useState('')
-  const [settings, setSettings] = useState({ destinationIp: config.artNet.destinationIp, portAddress: String(config.artNet.portAddress), bpm: String(config.bpm) })
-  const [settingsDirty, setSettingsDirty] = useState(false)
-  useEffect(() => {
-    if (!settingsDirty) setSettings({ destinationIp: config.artNet.destinationIp, portAddress: String(config.artNet.portAddress), bpm: String(config.bpm) })
-  }, [config, settingsDirty])
 
   const update = (patch: Partial<Config>) => onUpdate({ ...config, ...patch })
   const changeLoadout = (id: string) => {
@@ -460,29 +458,19 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
     if (!profileDraft || profileDraft.footprint >= 512) return
     setProfileDraft({ ...profileDraft, channels: [...profileDraft.channels, { offset: profileDraft.footprint, kind: 'fixed', value: 0 }], footprint: profileDraft.footprint + 1 })
   }
-  const applySettings = (event: FormEvent) => {
-    event.preventDefault()
-    const next = { ...config, artNet: { destinationIp: settings.destinationIp.trim(), portAddress: Number(settings.portAddress) }, bpm: Number(settings.bpm) }
-    const errors = validateConfig(next)
-    if (errors.length) { onNotice(errors[0]); return }
-    onUpdate(next)
-    setSettingsDirty(false)
-  }
 
   return <div className="fixtures-page">
-    <SectionHeading kicker="RIG CONFIGURATION" title="Fixtures" description="Define fixture channel maps, organize groups, and patch your active rig." />
+    <SectionHeading kicker="RIG CONFIGURATION" title="Fixtures" description="Define fixture channel maps, organize groups, and patch your active rig. Collapse sections you rarely change; StageGlow remembers which are open on this device." />
 
-    <section className="panel">
-      <div className="panel-heading">
-        <div><div className="section-kicker">01 / CHANNEL MAPS</div><h2>Fixture profiles</h2><p>Use your fixture manual to confirm every channel and safe value.</p></div>
-        <div className="template-actions">
-          <span className="tiny-label">START A TEMPLATE</span>
-          <div className="button-row">{templates.map((template) => <button className="button small" key={template.name} onClick={() => {
-            setProfileDraft(makeTemplate(`${template.name} fixture`, template.kinds)); setProfileMessage('')
-          }}>{template.name}</button>)}</div>
-        </div>
+    <Panel id="fixtures-profiles" kicker="01 / CHANNEL MAPS" title="Fixture profiles" defaultCollapsed={config.profiles.length > 0}
+      summary={`${config.profiles.length} profile${config.profiles.length === 1 ? '' : 's'}`}
+      help={<><p>Use your fixture manual to confirm every channel and safe value.</p><p><strong>Templates are suggestions, not fixture maps.</strong> Confirm channel order, shutter behavior, and safe values against the fixture manual before use.</p></>}>
+      <div className="template-actions">
+        <span className="tiny-label">START A TEMPLATE</span>
+        <div className="button-row">{templates.map((template) => <button className="button small" key={template.name} onClick={() => {
+          setProfileDraft(makeTemplate(`${template.name} fixture`, template.kinds)); setProfileMessage('')
+        }}>{template.name}</button>)}</div>
       </div>
-      <div className="template-warning"><strong>Templates are suggestions, not fixture maps.</strong> Confirm channel order, shutter behavior, and safe values against the fixture manual before use.</div>
       <div className="profile-grid">
         {config.profiles.length === 0 && <div className="empty-state">No profiles saved. Choose a template to begin.</div>}
         {config.profiles.map((profile) => <article className="profile-card" key={profile.id}>
@@ -493,6 +481,7 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
       </div>
       {profileDraft && <div className="editor-box">
         <div className="editor-title"><div><div className="section-kicker">PROFILE EDITOR</div><h3>{config.profiles.some((item) => item.id === profileDraft.id) ? 'Edit profile' : 'New template profile'}</h3></div><button className="text-button" onClick={() => setProfileDraft(null)}>Cancel</button></div>
+        {!config.profiles.some((item) => item.id === profileDraft.id) && <div className="template-warning"><strong>Templates are suggestions, not fixture maps.</strong> Confirm channel order, shutter behavior, and safe values against the fixture manual before use.</div>}
         <div className="form-grid two">
           {input('Profile name', profileDraft.name, (name) => setProfileDraft({ ...profileDraft, name }))}
           {input('Footprint (channels)', profileDraft.footprint, (raw) => {
@@ -520,8 +509,7 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
           </div>)}
         </div>
         <button className="button small" onClick={addChannel} disabled={profileDraft.footprint >= 512}>Add fixed channel</button>
-        <p className="subtle">Offsets start at 0: channel 1 is offset 0. Fixed channels are separate profile settings, not mood controls. On the SLIMPAR1210 QUAD, offsets 5, 6 and 7 are Strobe, Effect and Speed; leave all three at 0 for steady, mood-controlled lighting.</p>
-        <p className="subtle">Repeated colour channels follow the same mood colour on every emitter. Use only one master dimmer; on a white-only bar, map Left and Right dimmers as white. White-only fixtures follow mood intensity and ignore colour. Keep strobe, presets, programs and speed fixed at their manual's no-effect values. BARWASH 244 uses H001 mode for this eight-channel profile, not E001.</p>
+        <Help topic="Channel mapping tips"><p>Offsets start at 0: channel 1 is offset 0. Fixed channels are separate profile settings, not mood controls. On the SLIMPAR1210 QUAD, offsets 5, 6 and 7 are Strobe, Effect and Speed; leave all three at 0 for steady, mood-controlled lighting.</p><p>Repeated colour channels follow the same mood colour on every emitter. Use only one master dimmer; on a white-only bar, map Left and Right dimmers as white. White-only fixtures follow mood intensity and ignore colour. Keep strobe, presets, programs and speed fixed at their manual's no-effect values. BARWASH 244 uses H001 mode for this eight-channel profile, not E001.</p></Help>
         <div className="form-grid two mix-row">
           {input('White contribution (0-1)', profileDraft.whiteMix, (raw) => setProfileDraft({ ...profileDraft, whiteMix: Number(raw) }), { type: 'number', min: 0, max: 1, step: 0.01 })}
           {input('Amber contribution (0-1)', profileDraft.amberMix, (raw) => setProfileDraft({ ...profileDraft, amberMix: Number(raw) }), { type: 'number', min: 0, max: 1, step: 0.01 })}
@@ -529,11 +517,11 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
         {profileMessage && <p className="inline-error">{profileMessage}</p>}
         <div className="editor-footer"><button className="button primary" onClick={saveProfile}>Apply profile</button><span>Changes are staged until applied and then autosaved.</span></div>
       </div>}
-    </section>
+    </Panel>
 
     <div className="two-column">
-      <section className="panel">
-        <div className="panel-heading compact"><div><div className="section-kicker">02 / REUSABLE IDENTITIES</div><h2>Fixture groups</h2><p>Reusable groups targeted by your moods.</p></div></div>
+      <Panel id="fixtures-groups" kicker="02 / REUSABLE IDENTITIES" title="Fixture groups" help="Reusable groups targeted by your moods, such as Front, Back or Floor. Moods set colour and intensity per group."
+        summary={config.groups.map((group) => group.name).join(', ') || 'No groups'}>
         <div className="group-list">
           {config.groups.map((group) => <div className="group-row" key={group.id}>
             <span className="group-mark" /><input aria-label={`Group name ${group.name}`} value={groupDrafts[group.id] ?? group.name} onChange={(event) => setGroupDrafts({ ...groupDrafts, [group.id]: event.target.value })} />
@@ -543,10 +531,10 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
           {config.groups.length === 0 && <div className="empty-state">Create a group to assign fixtures.</div>}
         </div>
         <form className="inline-form" onSubmit={addGroup}><input aria-label="New group name" placeholder="e.g. Front" value={groupName} onChange={(event) => setGroupName(event.target.value)} /><button className="button small" type="submit">Add group</button></form>
-      </section>
+      </Panel>
 
-      <section className="panel">
-        <div className="panel-heading compact"><div><div className="section-kicker">03 / RIG PATCH</div><h2>Loadout</h2><p>Patch fixture addresses from 1 to 512.</p></div></div>
+      <Panel id="fixtures-loadout" kicker="03 / RIG PATCH" title="Loadout" help="A loadout is the fixtures patched for one venue or rig. Addresses run from 1 to 512; overlapping addresses are rejected. Duplicate a loadout to adapt it for another stage."
+        summary={currentLoadout ? `${currentLoadout.name} - ${currentLoadout.fixtures.length} fixtures` : 'No loadout'}>
         <div className="loadout-picker">
           <label className="field">Active loadout
             <select aria-label="Active loadout" value={currentLoadout?.id ?? ''} onChange={(event) => changeLoadout(event.target.value)}>
@@ -582,20 +570,8 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
           </form>}
         </>}
         {!currentLoadout && config.loadouts.length === 0 && <div className="empty-state">Create your first loadout above.</div>}
-      </section>
+      </Panel>
     </div>
-
-    <section className="panel settings-panel">
-      <div className="panel-heading compact"><div><div className="section-kicker">04 / CONNECTION & TEMPO</div><h2>Art-Net settings</h2><p>Stored for future venue output. No Art-Net packets are sent in this release.</p></div><span className="disabled-chip">ART-NET DISABLED</span></div>
-      <form onSubmit={applySettings}>
-        <div className="form-grid three">
-          <label className="field">Node IPv4 address<input inputMode="decimal" placeholder="Blank until configured" value={settings.destinationIp} onChange={(event) => { setSettings({ ...settings, destinationIp: event.target.value }); setSettingsDirty(true) }} /></label>
-          {input('Port-Address (0-32767)', settings.portAddress, (portAddress) => { setSettings({ ...settings, portAddress }); setSettingsDirty(true) }, { type: 'number', min: 0, max: 32767 })}
-          {input('Global BPM (20-300)', settings.bpm, (bpm) => { setSettings({ ...settings, bpm }); setSettingsDirty(true) }, { type: 'number', min: 20, max: 300, step: 0.1 })}
-        </div>
-        <div className="settings-footer"><p>Use a unicast IPv4 address. Confirm Port-Address mapping with your Art-Net node.</p><button className="button primary" type="submit">Apply settings</button></div>
-      </form>
-    </section>
   </div>
 }
 

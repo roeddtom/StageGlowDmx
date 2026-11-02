@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { makeId, makeMood, makeMoodGroup, maxHueVariance, randomBrightColor, removeMood, tapBPM, validateConfig, type Config, type Mood, type MoodGroup, type RuntimeState } from '../model'
 import { MoodSlider } from './MoodSlider'
+import { Heading, Help, Panel } from './Panel'
 
 export type SimulationCommand =
   | { action: 'select'; moodId: string }
@@ -67,16 +68,14 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
   }
 
   return <div className="moods-page">
-    <div className="section-heading">
-      <div><div className="section-kicker">GENTLE, EVOLVING LIGHT</div><h1>Moods</h1><p>Keep front lights steady while other groups glide through a palette. {!runtime ? 'Output state is unknown; real fixtures may still be lit.' : hardware ? 'Controls now affect real fixtures through USB.' : 'USB is disabled; mood controls affect software only.'}</p></div>
-      <div className="button-row">
+    <Heading page kicker="GENTLE, EVOLVING LIGHT" title="Moods" help={<p>Keep front lights steady while other groups glide through a palette. {!runtime ? 'Output state is unknown; real fixtures may still be lit.' : hardware ? 'Controls now affect real fixtures through USB.' : 'USB is disabled; mood controls affect software only.'}</p>}
+      action={<div className="button-row">
         <button className="button" onClick={() => { setDraft(makeMood(config.groups, true)); setError('') }}>Starter mood</button>
         <button className="button primary" onClick={() => { setDraft(makeMood(config.groups)); setError('') }}>New mood</button>
-      </div>
-    </div>
+      </div>} />
 
-    <section className="panel">
-      <div className="panel-heading"><div><div className="section-kicker">SAVED BEHAVIORS</div><h2>Your moods</h2><p>Choose one static Base and one Atmosphere. Atmosphere overrides its included groups; excluded groups use the Base, or stay dark without one. Selecting either never releases blackout.</p></div></div>
+    <Panel id="moods-list" kicker="SAVED BEHAVIORS" title="Your moods" summary={`${moods.length} mood${moods.length === 1 ? '' : 's'}`}
+      help="Choose one static Base and one Atmosphere. Atmosphere overrides its included groups; excluded groups use the Base, or stay dark without one. Selecting either never releases blackout.">
       <div className="profile-grid">
         {moods.length === 0 && <p className="empty-state">No moods yet. Create a starter mood after defining fixture groups.</p>}
         {moods.map((mood) => <article className={`profile-card ${active?.id === mood.id || activeBase?.id === mood.id ? 'selected-mood' : ''}`} key={mood.id}>
@@ -95,7 +94,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
           </div>
         </article>)}
       </div>
-    </section>
+    </Panel>
 
     {draft && <section className="panel mood-editor">
       <div className="editor-title"><div><div className="section-kicker">MOOD EDITOR</div><h2>{draft.name || 'Untitled mood'}</h2></div><button className="text-button" onClick={() => setDraft(null)}>Cancel mood edits</button></div>
@@ -112,7 +111,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
         {!baseDraft && <MoodSlider label="Hue variance" value={draft.hueVariance ?? 0} min={0} max={maxHueVariance * 100} step={1} scale={100} unit="%" endpoints={['Exact colours', 'Wider shades']} help="Adds variety to groups using palette drift. Each new colour target shifts its hue randomly by up to this share of the colour wheel in either direction (15% is about 54 degrees). Saturation and brightness stay the same. Static groups are unaffected. 0% uses the palette colours exactly." onChange={(hueVariance) => setDraft({ ...draft, hueVariance: Math.min(maxHueVariance, Math.max(0, hueVariance)) })} />}
         <MoodSlider label="Crossfade" value={draft.crossfadeSeconds} min={0} max={30} step={0.5} unit="s" help="How many seconds it takes to transition into this mood, including when restoring it from blackout. Zero switches immediately. Blackout itself is always immediate." onChange={(crossfadeSeconds) => setDraft({ ...draft, crossfadeSeconds })} />
       </div>
-      <p className="subtle">{baseDraft ? 'Base lighting is static. Include only the groups you want as fallback; an Atmosphere explicitly including a group overrides it, even at 0% intensity.' : 'Smoothness 1 glides for the whole interval. Equal intensity bounds keep brightness fixed. Exclude groups such as Front to preserve their Base lighting.'} UV defaults to off.</p>
+      <Help topic={baseDraft ? 'About Base lighting' : 'About this mood'}>{baseDraft ? 'Base lighting is static. Include only the groups you want as fallback; an Atmosphere explicitly including a group overrides it, even at 0% intensity.' : 'Smoothness 1 glides for the whole interval. Equal intensity bounds keep brightness fixed. Exclude groups such as Front to preserve their Base lighting.'} UV defaults to off.</Help>
       {config.groups.length === 0 && <p className="empty-state">Define groups on the Fixtures page first.</p>}
       {config.groups.map((group) => {
         const settings = draft.groups.find((item) => item.groupId === group.id)
@@ -143,8 +142,10 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
       <div className="editor-footer"><button className="button primary" onClick={apply}>Apply mood</button><span>Changes are staged until applied and then autosaved.</span></div>
     </section>}
 
-    <section className="panel simulation-panel">
-      <div className="panel-heading"><div><div className="section-kicker">{hardware ? 'PHYSICAL USB OUTPUT / NO ART-NET' : 'SOFTWARE PREVIEW / NO ART-NET'}</div><h2>{hardware ? 'USB mood control' : 'Mood simulation'}</h2><p>The server clock keeps advancing between browser visits. Selecting a mood while running crossfades smoothly.</p></div><span className="disabled-chip">{!runtime ? 'OUTPUT UNKNOWN' : hardware ? 'USB ENABLED' : 'USB DISABLED'}</span></div>
+    <Panel id="moods-simulation" className="simulation-panel" kicker={hardware ? 'PHYSICAL USB OUTPUT / NO ART-NET' : 'SOFTWARE PREVIEW / NO ART-NET'} title={hardware ? 'USB mood control' : 'Mood simulation'}
+      help="The server clock keeps advancing between browser visits. Selecting a mood while running crossfades smoothly. Values shown are generated output, not fixture feedback."
+      action={<span className="disabled-chip">{!runtime ? 'OUTPUT UNKNOWN' : hardware ? 'USB ENABLED' : 'USB DISABLED'}</span>}
+      summary={`${active?.name ?? 'No atmosphere'} / ${activeBase?.name ?? 'No base'}${runtime?.blackout ? ' / blackout' : ''}`}>
       <p>Atmosphere: <strong>{active?.name ?? 'None'}</strong> | Base: <strong>{activeBase?.name ?? 'None'}</strong> | {runtime ? (runtime.blackout ? 'Generated blackout latched' : 'Mood running') : 'Output state unknown; lights may still be running'}</p>
       <div className="simulation-controls">
         <button className="button danger-button" disabled={busy} onClick={() => void onCommand({ action: 'blackout', enabled: true })}>{hardware ? 'Blackout USB output' : 'Blackout simulation'}</button>
@@ -179,6 +180,6 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
         </article>)}
       </div>
       {runtime && <details className="dmx-details"><summary>Generated universe (512 channels)</summary><pre>{runtime.dmx.map((value, i) => `${i + 1}:${value}`).join(' ')}</pre></details>}
-    </section>
+    </Panel>
   </div>
 }
