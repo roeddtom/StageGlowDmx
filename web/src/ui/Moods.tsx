@@ -3,6 +3,7 @@ import { makeEffect, makeId, makeMood, makeMoodGroup, maxHueVariance, randomBrig
 import { MoodSlider } from './MoodSlider'
 import { Heading, Help, Panel } from './Panel'
 import { EffectButton } from './EffectButton'
+import { EffectPreview } from './EffectPreview'
 
 export type SimulationCommand =
   | { action: 'select'; moodId: string }
@@ -14,6 +15,7 @@ export type SimulationCommand =
   | { action: 'master'; value: number }
 
 type Props = {
+  visible: boolean
   config: Config
   runtime: RuntimeState | null
   ready: boolean
@@ -23,7 +25,7 @@ type Props = {
   onNotice: (message: string) => void
 }
 
-export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNotice }: Props) {
+export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNotice, visible }: Props) {
   const [draft, setDraft] = useState<Mood | null>(null)
   const [error, setError] = useState('')
   const [tempoInput, setTempoInput] = useState(String(config.bpm))
@@ -94,6 +96,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
               ? <EffectButton mood={mood} active={activeEffect?.id === mood.id} available={ready && !!runtime && !runtime.blackout && runtime.output.state !== 'fault'} busy={busy} onCommand={onCommand} className="button small secondary" />
               : <button className="button small secondary" disabled={!ready || busy} onClick={() => void onCommand({ action: 'select', moodId: mood.id })}>Select {mood.name}</button>}
             <button className="text-button" onClick={() => { setDraft(structuredClone(mood)); setError('') }} aria-label={`Edit ${mood.name}`}>Edit</button>
+            {mood.type === 'effect' && <button className="text-button" onClick={() => { setDraft(structuredClone(mood)); setError('') }} aria-label={`Preview ${mood.name}`}>Preview</button>}
             <button className="text-button" onClick={() => { setDraft({ ...structuredClone(mood), id: makeId(), name: `${mood.name} copy` }); setError('') }} aria-label={`Duplicate ${mood.name}`}>Duplicate</button>
             <button className="text-button danger-text" onClick={() => {
               if (!window.confirm(`Delete mood "${mood.name}"? This clears its Show and Pause assignments. Deleting a selected Base or Atmosphere blacks out the generated output.`)) return
@@ -157,6 +160,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
         </fieldset>
       })}
       {error && <p className="inline-error" role="alert">{error}</p>}
+      {effectDraft && visible && <EffectPreview key={draft.id} config={config} mood={draft} runtime={runtime} />}
       <div className="editor-footer"><button className="button primary" onClick={apply}>Apply mood</button><span>Changes are staged until applied and then autosaved.</span></div>
     </section>}
 

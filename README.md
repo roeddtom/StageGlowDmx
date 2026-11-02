@@ -149,6 +149,18 @@ Effect runs. Blackout and selecting the assigned Pause mood cancel it immediatel
 Effects cannot release blackout, be assigned as Pause, or survive a restart.
 Editing or deleting the active Effect cancels it; unrelated saves do not.
 
+Use an Effect's **Preview** button (or create/edit an Effect) to open its
+**Effect preview**. Choose a **Preview Base** and/or **Preview Atmosphere**;
+the currently selected live moods are offered initially. Choose **No background**
+to preview the effect alone from darkness, then press **Preview effect**.
+Unsaved edits work too. **Release preview effect** shows the manual release fade.
+The fixture swatches, intensity/UV and DMX values are software-only: preview
+never changes live selections, blackout, master, USB output or saved settings.
+It uses the active loadout, global tempo and a separate 100% master. Intensity-only
+effects cannot add colour to dark RGB fixtures; enable colour override for that,
+or preview over a lit background. White-only spots can preview intensity alone.
+Changing settings or leaving the Moods page stops the preview.
+
 ### Algam Lighting SLIMPAR1210 QUAD
 
 On Fixtures, select **Algam Lighting SLIMPAR1210 QUAD (8ch)** and apply the

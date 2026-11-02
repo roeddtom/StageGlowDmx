@@ -316,7 +316,7 @@ export function App() {
           {runtime?.outputEnabled && <p className="inline-error">Patch editing is locked while USB output is enabled. Use Disable USB in the banner or on the Output page first.</p>}
           <fieldset className="patch-controls" disabled={!runtime || runtime.outputEnabled || commandBusy}><Fixtures key={editorEpoch} config={config} onUpdate={updateConfig} onNotice={setNotice} /></fieldset>
         </div>
-        <div hidden={page !== 'moods'}><Moods key={editorEpoch} config={config} runtime={runtime} ready={saveState === 'saved' && backendConnected && runtime !== null} busy={commandBusy} onUpdate={updateConfig} onCommand={simulation} onNotice={setNotice} /></div>
+        <div hidden={page !== 'moods'}><Moods key={editorEpoch} visible={page === 'moods'} config={config} runtime={runtime} ready={saveState === 'saved' && backendConnected && runtime !== null} busy={commandBusy} onUpdate={updateConfig} onCommand={simulation} onNotice={setNotice} /></div>
         {page === 'show' && <ShowSetup config={config} ready={saveState === 'saved' && backendConnected && runtime !== null} onUpdate={updateConfig} onEnter={() => { setNotice(''); setPerforming(true) }} />}
       </main>
 

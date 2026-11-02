@@ -67,6 +67,10 @@ func NewWithOutput(store *config.Store, frontend http.Handler, controller *outpu
 		commands.Lock()
 		defer commands.Unlock()
 		switch r.URL.Path {
+		case "/api/effects/preview":
+			if requireMethod(w, r, http.MethodPost) {
+				previewEffect(w, r, store.Get())
+			}
 		case "/api/health":
 			if requireMethod(w, r, http.MethodGet) {
 				writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

@@ -243,6 +243,7 @@ input::placeholder { color: #74807d; }
 .panel-body .template-actions { align-items: flex-start; margin-bottom: 14px; }
 
 .show-assignments { margin-top: 20px; }
+.effect-preview { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
 .show-screen { position: fixed; inset: 0; height: 100vh; height: 100dvh; display: flex; flex-direction: column; gap: 6px; padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); background: #0c1010; overflow: hidden; }
 .show-toolbar { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
 .show-status { min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
