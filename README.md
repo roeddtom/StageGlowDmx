@@ -151,6 +151,11 @@ fixtures ignore mood colours (even black) and use mood intensity instead;
 set intensity to zero or use blackout to darken them. Their preview uses
 neutral white to indicate brightness, not calibrated colour temperature.
 
+For single-colour LED spots with just one intensity channel, use the
+**White spot (1ch)** template: its only channel follows mood intensity and the
+master fader. If the spot has extra channels (strobe, modes), add them as
+fixed channels at their no-effect values.
+
 Strobe and built-in programs remain separate fixed profile values, outside mood
 control, with zero blackout values. Verify these no-effect defaults against
 your fixture's manual/revision before enabling USB. The Barwash H001 map is

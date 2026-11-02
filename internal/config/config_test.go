@@ -34,7 +34,7 @@ func TestValidation(t *testing.T) {
 		{"duplicate profile", func(c *Config) { c.Profiles = append(c.Profiles, c.Profiles[0]) }},
 		{"duplicate group", func(c *Config) { c.Groups = append(c.Groups, c.Groups[0]) }},
 		{"duplicate loadout", func(c *Config) { c.Loadouts = append(c.Loadouts, c.Loadouts[0]) }},
-		{"small footprint", func(c *Config) { c.Profiles[0].Footprint = 2 }},
+		{"small footprint", func(c *Config) { c.Profiles[0].Footprint = 0 }},
 		{"large footprint", func(c *Config) { c.Profiles[0].Footprint = 513 }},
 		{"missing offset", func(c *Config) { c.Profiles[0].Channels = c.Profiles[0].Channels[:2] }},
 		{"duplicate offset", func(c *Config) { c.Profiles[0].Channels[2].Offset = 1 }},
@@ -117,6 +117,7 @@ func TestLinkedEmittersAndWhiteOnlyProfiles(t *testing.T) {
 		{"dimmer", "fixed", "red", "green", "blue", "red", "green", "blue", "fixed", "fixed", "fixed"},
 		{"dimmer", "fixed", "white", "white", "fixed"},
 		{"white", "white", "fixed"},
+		{"white"},
 	} {
 		c := rig()
 		p := &c.Profiles[0]
@@ -132,6 +133,9 @@ func TestLinkedEmittersAndWhiteOnlyProfiles(t *testing.T) {
 		c.Loadouts[0].Fixtures[0].StartAddress = 1
 		if err := c.Validate(); err != nil {
 			t.Fatal("linked emitters or white-only profile rejected", kinds, err)
+		}
+		if len(p.Channels) < 3 {
+			continue
 		}
 		p.Channels[2].Offset = 1
 		if c.Validate() == nil {

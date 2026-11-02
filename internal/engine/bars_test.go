@@ -19,6 +19,7 @@ func TestLinkedBarRendering(t *testing.T) {
 		{"CBB RGB", []string{"dimmer", "fixed", "red", "green", "blue", "red", "green", "blue", "fixed", "fixed", "fixed"}, []int{64, 0, 255, 128, 0, 255, 128, 0, 0, 0, 0}, "#402000"},
 		{"CBB WW", []string{"dimmer", "fixed", "white", "white", "fixed"}, []int{64, 0, 255, 255, 0}, "#404040"},
 		{"White without master", []string{"white", "white", "fixed"}, []int{64, 64, 0}, "#404040"},
+		{"Single white spot", []string{"white"}, []int{64}, "#404040"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			c := testRig()

@@ -275,8 +275,8 @@ func (c Config) Validate() error {
 		if err := identity(p.ID, p.Name, "profiles", ids); err != nil {
 			return err
 		}
-		if p.Footprint < 3 || p.Footprint > 512 || len(p.Channels) != p.Footprint {
-			return invalid("profile %q must cover every channel of a footprint from 3 to 512", p.ID)
+		if p.Footprint < 1 || p.Footprint > 512 || len(p.Channels) != p.Footprint {
+			return invalid("profile %q must cover every channel of a footprint from 1 to 512", p.ID)
 		}
 		if !unit(p.WhiteMix) || !unit(p.AmberMix) {
 			return invalid("profile %q mix values must be finite numbers from 0 to 1", p.ID)

@@ -486,7 +486,7 @@ function Fixtures({ config, onUpdate, onNotice }: { config: Config; onUpdate: (n
           {input('Profile name', profileDraft.name, (name) => setProfileDraft({ ...profileDraft, name }))}
           {input('Footprint (channels)', profileDraft.footprint, (raw) => {
             const footprint = Number(raw)
-            if (Number.isInteger(footprint) && footprint >= 3 && footprint <= 512) {
+            if (Number.isInteger(footprint) && footprint >= 1 && footprint <= 512) {
               const channels = [...profileDraft.channels]
               while (channels.length < footprint) channels.push({ offset: channels.length, kind: 'fixed', value: 0 })
               setProfileDraft({ ...profileDraft, footprint, channels: channels.slice(0, footprint).map((channel, i) => ({ ...channel, offset: channel.offset < footprint ? channel.offset : i })) })

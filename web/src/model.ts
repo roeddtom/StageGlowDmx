@@ -137,6 +137,7 @@ export const templates: { name: string; kinds: ChannelKind[] }[] = [
   { name: 'RGBA', kinds: ['red', 'green', 'blue', 'amber'] },
   { name: 'RGBW', kinds: ['red', 'green', 'blue', 'white'] },
   { name: 'RGBWAUV', kinds: ['red', 'green', 'blue', 'white', 'amber', 'uv'] },
+  { name: 'White spot (1ch)', kinds: ['white'] },
   { name: 'Algam Lighting SLIMPAR1210 QUAD (8ch)', kinds: ['dimmer', 'red', 'green', 'blue', 'white', 'fixed', 'fixed', 'fixed'] },
   { name: 'Algam Lighting BARWASH 244 (8ch H001)', kinds: ['dimmer', 'red', 'green', 'blue', 'white', 'fixed', 'fixed', 'fixed'] },
   { name: 'Eurolite LED CBB-2 COB RGB Bar (11ch)', kinds: ['dimmer', 'fixed', 'red', 'green', 'blue', 'red', 'green', 'blue', 'fixed', 'fixed', 'fixed'] },
@@ -241,8 +242,8 @@ export function validateConfig(input: unknown): string[] {
     if (!checkShape(rawProfile, 'Profile', ['id', 'name', 'footprint', 'channels', 'whiteMix', 'amberMix'])) continue
     const profile = rawProfile as Profile
     if (!isText(profile.name)) errors.push('Every profile needs a name.')
-    if (!isIntegerIn(profile.footprint, 3, 512)) {
-      errors.push(`Profile "${profile.name || profile.id}" footprint must be 3-512 channels.`)
+    if (!isIntegerIn(profile.footprint, 1, 512)) {
+      errors.push(`Profile "${profile.name || profile.id}" footprint must be 1-512 channels.`)
       continue
     }
     if (!Array.isArray(profile.channels)) {
@@ -314,7 +315,7 @@ export function validateConfig(input: unknown): string[] {
         continue
       }
       const profile = profiles.find((item) => item.id === fixture.profileId)
-      if (!profile || !isIntegerIn(profile.footprint, 3, 512)) continue
+      if (!profile || !isIntegerIn(profile.footprint, 1, 512)) continue
       if (fixture.startAddress + profile.footprint - 1 > 512) {
         errors.push(`Fixture "${fixture.name}" extends past DMX address 512.`)
       }

@@ -35,6 +35,17 @@ describe('configuration validation', () => {
     }
   })
 
+  it('accepts a one-channel white spot profile', () => {
+    const config = patchedRig()
+    const template = templates.find((item) => item.name === 'White spot (1ch)')
+    assert.ok(template)
+    const profile = makeTemplate(template.name, template.kinds)
+    config.profiles = [profile]
+    config.loadouts[0].fixtures[0].profileId = profile.id
+    assert.equal(profile.footprint, 1)
+    assert.deepEqual(validateConfig(config), [])
+  })
+
   it('creates an eight-channel SLIMPAR1210 QUAD profile with effects safely fixed off', () => {
     const config = patchedRig()
     const template = templates.find((item) => item.name === 'Algam Lighting SLIMPAR1210 QUAD (8ch)')
