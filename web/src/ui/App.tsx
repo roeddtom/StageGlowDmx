@@ -59,6 +59,7 @@ export function App() {
   const [editVersion, setEditVersion] = useState(0)
   const [commandBusy, setCommandBusy] = useState(false)
   const commandVersion = useRef(0)
+  const lightingCommands = useRef(0)
   const showEnableAttempted = useRef(false)
   const configRef = useRef<Config | null>(null)
   const versionRef = useRef(0)
@@ -211,7 +212,8 @@ export function App() {
   }, [loaded, page, performing])
 
   const simulation = async (command: SimulationCommand) => {
-    if (commandBusy) return
+    if (commandBusy && command.action !== 'stop-effect') return
+    lightingCommands.current++
     commandVersion.current++
     setCommandBusy(true)
     try {
@@ -223,7 +225,8 @@ export function App() {
       setNotice(error instanceof Error ? error.message : 'Lighting command failed.')
     } finally {
       commandVersion.current++
-      setCommandBusy(false)
+      lightingCommands.current--
+      setCommandBusy(lightingCommands.current > 0)
     }
   }
 

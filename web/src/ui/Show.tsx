@@ -3,6 +3,7 @@ import { emptyShow, makeMood, tapBPM, type Config, type RuntimeState } from '../
 import type { SimulationCommand } from './Moods'
 import { MicrophoneTempo } from './MicrophoneTempo'
 import { Heading, Help, Panel } from './Panel'
+import { EffectButton } from './EffectButton'
 
 type Props = {
   config: Config
@@ -42,7 +43,7 @@ function MasterDimmer({ value, available, busy, onCommand }: {
 export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'config' | 'ready' | 'onUpdate'> & { onEnter: () => void }) {
   const layout = config.show ?? emptyShow()
   const moods = config.moods ?? []
-  const options = <><option value="">Unassigned</option>{moods.map((mood) => <option key={mood.id} value={mood.id}>{mood.type === 'base' ? '[BASE] ' : ''}{mood.name}</option>)}</>
+  const options = <><option value="">Unassigned</option>{moods.map((mood) => <option key={mood.id} value={mood.id}>{mood.type === 'base' ? '[BASE] ' : mood.type === 'effect' ? '[EFFECT] ' : ''}{mood.name}</option>)}</>
   return <div>
     <Heading page kicker="PERFORMANCE LAYOUT" title="Show" help="Choose your mood buttons, then enter a screen-filling grid. Blackout, Pause and Tap Tempo always stay in the same bottom row."
       action={<button className="button primary" disabled={!ready} onClick={onEnter}>Enter show mode</button>} />
@@ -54,7 +55,7 @@ export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'con
           if (layout.slots.slice(count).some(Boolean) && !window.confirm('Remove assignments from the last show buttons? The moods themselves will not be deleted.')) return
           onUpdate({ ...config, show: { ...layout, slots: Array.from({ length: count }, (_, i) => layout.slots[i] ?? '') } })
         }}>{[8, 9, 10, 11, 12].map((count) => <option key={count} value={count}>{count}</option>)}</select></label>
-        <label className="field">Low-light Pause mood<select value={layout.pauseMoodId} onChange={(event) => onUpdate({ ...config, show: { ...layout, pauseMoodId: event.target.value } })}><option value="">Unassigned</option>{moods.filter((mood) => mood.type !== 'base').map((mood) => <option key={mood.id} value={mood.id}>{mood.name}</option>)}</select></label>
+        <label className="field">Low-light Pause mood<select value={layout.pauseMoodId} onChange={(event) => onUpdate({ ...config, show: { ...layout, pauseMoodId: event.target.value } })}><option value="">Unassigned</option>{moods.filter((mood) => mood.type !== 'base' && mood.type !== 'effect').map((mood) => <option key={mood.id} value={mood.id}>{mood.name}</option>)}</select></label>
       </div>
       <Help topic="About Pause">Pause is an Atmosphere: it keeps the selected Base for excluded groups. Exclude Front from Pause to retain Base front lighting. Included groups override the Base. Choose gentle static lighting with UV off.</Help>
       {!layout.pauseMoodId && <button className="button" disabled={!config.groups.length} onClick={() => {
@@ -70,6 +71,7 @@ export function ShowSetup({ config, ready, onUpdate, onEnter }: Pick<Props, 'con
     <Panel id="show-before" title="Before performing" defaultCollapsed summary="Show behaviour and safety notes">
       <p>Entering Show automatically enables the configured USB interface in blackout. Verify fixture channels and safe values first. Already-enabled output is left unchanged; failures require an explicit retry on the Output page. Simulation-only settings remain simulation.</p>
       <p>Base buttons change static fallback lighting; Atmosphere buttons change the atmosphere selection. Both can be selected at once in any grid position. No base clears the fallback. Mood, Base and Pause buttons immediately resume lighting from blackout, without another tap or confirmation. Blackout can also be toggled off to restore the current combination.</p>
+      <p>Effect buttons are temporary overlays and never release blackout. Timed effects return automatically, Hold runs while pressed (30-second safety limit), and Toggle runs until pressed again or Stop effect is used. Only one effect runs at a time. Blackout cancels effects immediately.</p>
       <p className="subtle">Show mode hides configuration and navigation. Leaving requires confirmation and does not stop output. Browser fullscreen is optional. A disconnected browser does not stop the server; output may continue.</p>
     </Panel>
   </div>
@@ -88,6 +90,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
   const [manualVersion, setManualVersion] = useState(0)
   const active = config.moods.find((mood) => mood.id === runtime?.activeMoodId)
   const base = config.moods.find((mood) => mood.id === runtime?.activeBaseMoodId)
+  const effect = config.moods.find((mood) => mood.id === runtime?.activeEffectId)
   const pause = config.moods.find((mood) => mood.id === layout.pauseMoodId)
   const hardware = runtime?.outputEnabled === true
   const fault = runtime?.output.state === 'fault'
@@ -112,7 +115,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
     <header className="show-toolbar">
       <div className={`show-status ${!runtime || fault ? 'show-warning' : ''}`} role="status">
         <strong>{!runtime ? 'DISCONNECTED - OUTPUT UNKNOWN' : fault ? 'USB FAULT - LIGHTS MAY STAY ON' : hardware ? 'USB OUTPUT' : 'SIMULATION - USB DISABLED'}</strong>
-        <span title={`Base: ${base?.name ?? 'None'} | Atmosphere: ${active?.name ?? 'None'}`}>{runtime ? `${runtime.blackout ? 'BLACKOUT' : 'Playing'}: ${active?.name ?? 'None'} | Base: ${base?.name ?? 'None'}` : 'Server may still be running lights. No commands queued.'}</span>
+        <span title={`Base: ${base?.name ?? 'None'} | Atmosphere: ${active?.name ?? 'None'} | Effect: ${effect?.name ?? 'None'}`}>{runtime ? `${runtime.blackout ? 'BLACKOUT' : 'Playing'}: ${active?.name ?? 'None'} | Base: ${base?.name ?? 'None'}${effect ? ` | FX: ${effect.name}` : ''}` : 'Server may still be running lights. No commands queued.'}</span>
       </div>
       <div className="show-tools">
         <button className="button" onClick={() => void fullscreen()}>Fullscreen</button>
@@ -124,6 +127,7 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
       </div>
       <div className="show-levels">
         <button className="button show-no-base" data-command-pending={busy && playable && !!base} disabled={!canPlay || !base} onClick={() => void onCommand({ action: 'clear-base' })}>No base</button>
+        {effect && <button className="button show-no-base" disabled={!playable} onClick={() => void onCommand({ action: 'stop-effect' })}>Stop effect</button>}
         <MasterDimmer value={runtime?.master ?? 1} available={ready && !!runtime && !fault} busy={busy} onCommand={onCommand} />
       </div>
       <MicrophoneTempo bpm={config.bpm} available={ready && !!runtime && !fault} manualVersion={manualVersion} onTempo={(bpm) => onUpdate({ ...config, bpm })} />
@@ -134,6 +138,13 @@ export function Show({ config, runtime, ready, busy, onUpdate, onCommand, onExit
         const mood = config.moods.find((item) => item.id === id)
         const isBase = mood?.type === 'base'
         const selected = Boolean(mood && (isBase ? runtime?.activeBaseMoodId : runtime?.activeMoodId) === mood.id)
+        if (mood?.type === 'effect') return <EffectButton key={index} mood={mood} active={effect?.id === mood.id} available={playable && !runtime?.blackout} busy={busy} onCommand={onCommand}
+          className={`show-mood show-effect ${effect?.id === mood.id ? 'is-selected' : ''}`}>
+          <span className="show-slot-number">{index + 1} / EFFECT</span>
+          <strong>{mood.name}</strong>
+          <span className="show-slot-state">{effect?.id === mood.id ? 'RUNNING' : mood.effect?.activation === 'hold' ? 'Hold (max 30s)' : mood.effect?.activation === 'toggle' ? 'Toggle on / off' : `${mood.effect?.durationBeats} beats / one-shot`}</span>
+          <span className="show-palette" aria-hidden="true">{mood.groups.flatMap((group) => group.palette).slice(0, 8).map((color, i) => <i key={i} style={{ backgroundColor: color }} />)}</span>
+        </EffectButton>
         return <button key={index} className={`show-mood ${isBase ? 'show-base' : ''} ${selected && !runtime?.blackout ? 'is-selected' : ''}`} data-command-pending={busy && playable && !!mood} disabled={!canPlay || !mood} aria-pressed={selected && !runtime?.blackout} onClick={() => { if (mood) void onCommand({ action: 'play', moodId: mood.id }) }}>
           <span className="show-slot-number">{index + 1}{isBase ? ' / BASE' : ''}</span>
           <strong>{mood?.name ?? 'Unassigned'}</strong>

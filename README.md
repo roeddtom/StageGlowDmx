@@ -84,7 +84,8 @@ Schema-1 backups from the configuration-only release load with an empty mood lis
 ### Base and Atmosphere lighting
 
 Each mood has a **Mood type**: Atmosphere (the default, including all older
-backups) or Base. One of each can be selected independently.
+backups), Base or Effect. One Base and one Atmosphere can be selected independently,
+with one temporary Effect over the top.
 
 - **Base** provides static fallback lighting: one colour and fixed intensity per
   included group. Create looks such as "Band front" and "Announcer", including
@@ -105,13 +106,48 @@ still override the Base: exclude Front from Pause to preserve Base front lightin
 The supplied Pause starter includes every group, so adjust its group assignments
 when using it with a Base.
 
-Blackout overrides both layers. Moods-editor selections made while blacked out
+Blackout overrides all layers and immediately cancels Effects. Moods-editor selections made while blacked out
 remain pending; Show mood buttons instead select and resume immediately.
 Releasing blackout fades in their combination over the longer selected
 crossfade duration. Master applies to the combined output once. Base-only
 lighting works without selecting an Atmosphere. Neither selection persists after
 restart. Deleting a selected mood or changing its type clears that layer and
-latches blackout; changing a Pause mood to Base clears its Pause assignment.
+latches blackout; changing a Pause mood to Base or Effect clears its Pause assignment.
+
+### Temporary Effects
+
+Choose **Moods > New effect**, select groups and target intensities, then save.
+Effects can be assigned to any Show button alongside Base and Atmosphere moods;
+their buttons have a gold border and an **EFFECT** label.
+
+| Pattern | Behaviour |
+|---|---|
+| Swell | Smoothly rises toward the target and falls back |
+| Accent | Short attack followed by a soft decay |
+| Solo highlight | Fades into a target look, sustains, then fades back |
+| Gentle pulse | Smoothly cycles between the running look and the target |
+
+**Timed one-shot** runs for the configured beat duration on the Pi, even without
+a browser connected. Duration and pulse cycle follow the global tempo.
+**Hold** runs while the button is pressed (mouse, touch, Space or Enter) and fades
+out on release, cancellation, focus loss or leaving the page. A lost release
+has a hard **30-second server-side limit**. Held Swell rises and sustains, Accent
+and Solo sustain, and Pulse repeats. **Toggle** uses the same sustained behaviour
+until triggered again or stopped; it intentionally continues if the browser disconnects.
+
+Effects default to **intensity only**, preserving the underlying colour and UV
+proportions. They cannot introduce colour into an otherwise dark RGB group.
+Enable **Override colour and UV** to supply a target colour/UV as well, including
+for groups with no underlying lighting. Target intensity can brighten or dim;
+the master fader still applies once to the final result.
+
+Only one Effect is active; a new trigger replaces it. Base and Atmosphere clocks
+keep running underneath, so an ending Effect reveals their current look rather
+than restarting them. **Stop release** controls the fade after a manual stop;
+timed Effects shape their own ending. **Stop effect** is available while an
+Effect runs. Blackout and selecting the assigned Pause mood cancel it immediately.
+Effects cannot release blackout, be assigned as Pause, or survive a restart.
+Editing or deleting the active Effect cancels it; unrelated saves do not.
 
 ### Algam Lighting SLIMPAR1210 QUAD
 

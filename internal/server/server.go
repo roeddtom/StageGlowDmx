@@ -129,6 +129,14 @@ func NewWithOutput(store *config.Store, frontend http.Handler, controller *outpu
 			}
 			var err error
 			switch {
+			case command.Action == "effect" && command.MoodID != nil && command.Enabled == nil && command.Value == nil:
+				err = controller.Effect(*command.MoodID, false, hardware)
+			case command.Action == "stop-effect" && command.Enabled == nil && command.Value == nil:
+				id := ""
+				if command.MoodID != nil {
+					id = *command.MoodID
+				}
+				err = controller.Effect(id, true, hardware)
 			case command.Action == "play" && command.MoodID != nil && command.Enabled == nil && command.Value == nil:
 				err = controller.Play(*command.MoodID, hardware)
 			case command.Action == "select" && command.MoodID != nil && command.Enabled == nil && command.Value == nil:
@@ -140,7 +148,7 @@ func NewWithOutput(store *config.Store, frontend http.Handler, controller *outpu
 			case command.Action == "master" && command.Value != nil && command.MoodID == nil && command.Enabled == nil:
 				err = controller.Master(*command.Value)
 			default:
-				err = fmt.Errorf("use select or play with moodId, clear-base, blackout with enabled, or master with value")
+				err = fmt.Errorf("use select, play or effect with moodId, stop-effect, clear-base, blackout with enabled, or master with value")
 			}
 			if err != nil {
 				fail(w, http.StatusBadRequest, err.Error())

@@ -30,6 +30,58 @@ func TestSimulationCommandsAndPersistedMoods(t *testing.T) {
 	if err := store.Save(c); err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("effect commands and blackout safety", func(t *testing.T) {
+		_, store, dir := setup(t)
+		c := store.Get()
+		c.Groups = []config.Group{{ID: "front", Name: "Front"}}
+		mood := config.Mood{ID: "warm", Name: "Warm", BeatsPerChange: 8, Smoothness: 1,
+			Groups: []config.MoodGroup{{GroupID: "front", ColorMode: "static", Palette: []string{"#ffffff"}, IntensityMin: 1, IntensityMax: 1}}}
+		fx := mood
+		fx.ID, fx.Name, fx.Type = "fx", "Accent", "effect"
+		fx.Effect = &config.Effect{Pattern: "accent", Activation: "hold", DurationBeats: 4}
+		c.Moods = []config.Mood{mood, fx}
+		if err := store.Save(c); err != nil {
+			t.Fatal(err)
+		}
+		now := time.Unix(1000, 0)
+		h := NewWithEngine(store, nil, engine.New(c, func() time.Time { return now }, 42))
+		call := func(body string, status int) engine.State {
+			t.Helper()
+			w := request(h, "POST", "/api/simulation", body)
+			if w.Code != status {
+				t.Fatal(w.Code, w.Body.String())
+			}
+			var s engine.State
+			json.Unmarshal(w.Body.Bytes(), &s)
+			return s
+		}
+		call(`{"action":"effect","moodId":"fx"}`, 400)
+		call(`{"action":"play","moodId":"fx"}`, 400)
+		call(`{"action":"select","moodId":"fx"}`, 400)
+		call(`{"action":"play","moodId":"warm"}`, 200)
+		for _, invalid := range []string{
+			`{"action":"effect"}`, `{"action":"effect","moodId":"warm"}`,
+			`{"action":"effect","moodId":"fx","enabled":true}`, `{"action":"stop-effect","value":1}`,
+		} {
+			call(invalid, 400)
+		}
+		if s := call(`{"action":"effect","moodId":"fx"}`, 200); s.ActiveEffectID != "fx" || s.ActiveMoodID != "warm" {
+			t.Fatal("effect command changed mood selection", s)
+		}
+		now = now.Add(time.Second)
+		if s := call(`{"action":"stop-effect","moodId":"fx"}`, 200); s.ActiveEffectID != "" || s.Blackout {
+			t.Fatal("stop effect failed", s)
+		}
+		call(`{"action":"effect","moodId":"fx"}`, 200)
+		if s := call(`{"action":"blackout","enabled":true}`, 200); s.ActiveEffectID != "" || !s.Blackout {
+			t.Fatal("blackout retained effect", s)
+		}
+		reopened, err := config.Open(dir)
+		if err != nil || reopened.Get().Moods[1].Effect.Pattern != "accent" {
+			t.Fatal("effect settings were not persisted", err)
+		}
+	})
 	now := time.Unix(1000, 0)
 	h := NewWithEngine(store, nil, engine.New(store.Get(), func() time.Time { return now }, 42))
 	state := func() engine.State {

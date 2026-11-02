@@ -48,11 +48,13 @@ There is not a second, separate hardware mood generator.
 | `internal\config\store.go` | Read/write configuration safely |
 | `internal\server\server.go` | Expose HTTP endpoints |
 | `internal\engine\engine.go` | Generate lighting from elapsed time |
+| `internal\engine\effects.go` | Blend one temporary effect over running Base/Atmosphere layers; enforce timed endings and held-effect timeout |
 | `internal\output\controller.go` | Own output enablement, cadence, and fault handling |
 | `internal\output\enttec.go` | Encode and send the USB PRO serial protocol |
 | `web\src\ui\App.tsx` | Browser loading, autosave, polling, command routing |
 | `web\src\ui\Moods.tsx` | Mood editing and preview controls |
 | `web\src\ui\Show.tsx` | Performance grid and blackout toggle |
+| `web\src\ui\EffectButton.tsx` | Shared timed/toggle/hold triggers, including quick release and pointer/keyboard cancellation |
 
 `internal` has a special meaning in Go: packages under it can only be imported
 from the permitted parent directory tree. These packages are application

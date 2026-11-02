@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { emptyConfig, makeTemplate, templates, makeMood, randomBrightColor, removeMood, tapBPM, validateConfig } from './model.ts'
+import { emptyConfig, makeTemplate, templates, makeMood, makeEffect, randomBrightColor, removeMood, tapBPM, validateConfig } from './model.ts'
 
 function patchedRig() {
   const config = emptyConfig()
@@ -12,6 +12,32 @@ function patchedRig() {
 }
 
 describe('configuration validation', () => {
+  it('validates temporary effects, their targets and Show assignments', () => {
+    const config = patchedRig()
+    const effect = makeEffect(config.groups)
+    config.moods = [effect]
+    config.show.slots[0] = effect.id
+    assert.deepEqual(validateConfig(config), [])
+    for (const change of [
+      c => { delete c.moods[0].effect },
+      c => { c.moods[0].effect.pattern = 'strobe' },
+      c => { c.moods[0].effect.activation = 'forever' },
+      c => { c.moods[0].effect.durationBeats = 0 },
+      c => { c.moods[0].effect.overrideColour = 'yes' },
+      c => { delete c.moods[0].effect.overrideColour },
+      c => { c.moods[0].groups = [] },
+      c => { c.moods[0].groups[0].intensityMin = 0.2 },
+      c => { c.moods[0].groups[0].colorMode = 'palette' },
+      c => { c.moods[0].hueVariance = 0.1 },
+      c => { c.moods[0].type = 'atmosphere' },
+      c => { c.show.pauseMoodId = effect.id },
+    ]) {
+      const next = structuredClone(config)
+      change(next)
+      assert.ok(validateConfig(next).length > 0)
+    }
+    assert.equal(removeMood(config, effect.id).show.slots[0], '')
+  })
   it('accepts linked RGB and white-only bar templates with programs fixed off', () => {
     const config = patchedRig()
     const expected = new Map([

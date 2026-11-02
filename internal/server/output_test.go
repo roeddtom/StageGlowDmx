@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	"stageglowdmx/internal/config"
 	"stageglowdmx/internal/engine"
@@ -48,11 +49,15 @@ func testUSBOutputAPI(t *testing.T, mode string) {
 	}}
 	c.Moods = append(c.Moods, config.Mood{ID: "base", Name: "Front base", Type: "base", BeatsPerChange: 8, Smoothness: 1,
 		Groups: []config.MoodGroup{{GroupID: "front", ColorMode: "static", Palette: []string{"#0000ff"}, IntensityMin: 0.25, IntensityMax: 0.25}}})
+	c.Moods = append(c.Moods, config.Mood{ID: "fx", Name: "Blue highlight", Type: "effect", BeatsPerChange: 4, Smoothness: 1,
+		Effect: &config.Effect{Pattern: "solo", Activation: "toggle", DurationBeats: 4, OverrideColour: true},
+		Groups: []config.MoodGroup{{GroupID: "front", ColorMode: "static", Palette: []string{"#0000ff"}, IntensityMin: 1, IntensityMax: 1}}})
 	if err := store.Save(c); err != nil {
 		t.Fatal(err)
 	}
 	device := &usbDevice{}
-	controller := output.New(c, engine.New(c, nil, 1), func(string) (output.Device, error) { return device, nil })
+	now := time.Unix(1000, 0)
+	controller := output.New(c, engine.New(c, func() time.Time { return now }, 1), func(string) (output.Device, error) { return device, nil })
 	defer controller.Shutdown()
 	h := NewWithOutput(store, nil, controller)
 	call := func(method, path, body string, status int) {
@@ -106,7 +111,22 @@ func testUSBOutputAPI(t *testing.T, mode string) {
 	if device.frames[len(device.frames)-1][0] != 255 {
 		t.Fatal("hardware release did not send mood")
 	}
+	call("POST", "/api/simulation", `{"action":"effect","moodId":"fx"}`, 409)
+	call("POST", "/api/lighting", `{"action":"effect","moodId":"fx"}`, 200)
+	now = now.Add(time.Second)
+	call("POST", "/api/lighting", `{"action":"master","value":1}`, 200)
+	// Force a synchronous hardware write of the effect frame.
+	call("POST", "/api/lighting", `{"action":"blackout","enabled":false}`, 200)
+	if frame := device.frames[len(device.frames)-1]; frame[0] != 0 || frame[2] != 255 {
+		t.Fatal("effect was not rendered through USB", frame[:3])
+	}
+	call("POST", "/api/simulation", `{"action":"stop-effect"}`, 409)
+	call("POST", "/api/lighting", `{"action":"stop-effect","moodId":"fx"}`, 200)
+	call("POST", "/api/lighting", `{"action":"effect","moodId":"fx"}`, 200)
 	call("POST", "/api/simulation", `{"action":"blackout","enabled":true}`, 200)
+	if state().ActiveEffectID != "" {
+		t.Fatal("hardware blackout retained effect")
+	}
 	if device.frames[len(device.frames)-1][0] != 0 {
 		t.Fatal("emergency simulation blackout must also darken USB")
 	}

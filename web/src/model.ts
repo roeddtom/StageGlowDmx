@@ -31,7 +31,13 @@ export type MoodGroup = {
 export type Mood = {
   id: string
   name: string
-  type?: 'atmosphere' | 'base'
+  type?: 'atmosphere' | 'base' | 'effect'
+  effect?: {
+    pattern: 'swell' | 'accent' | 'solo' | 'pulse'
+    activation: 'timed' | 'hold' | 'toggle'
+    durationBeats: number
+    overrideColour: boolean
+  }
   beatsPerChange: number
   smoothness: number
   hueVariance?: number
@@ -44,6 +50,7 @@ export type RuntimeState = {
   engineStatus: string
   activeMoodId: string
   activeBaseMoodId: string
+  activeEffectId: string
   bpm: number
   master: number
   output: {
@@ -121,6 +128,14 @@ export function makeMood(groups: Group[], starter = false): Mood {
       // The starter keeps front light steady so faces stay evenly lit.
       return starter && front ? { ...settings, intensityMax: settings.intensityMin } : settings
     }),
+  }
+}
+
+export function makeEffect(groups: Group[]): Mood {
+  return {
+    ...makeMood(groups), name: 'New effect', type: 'effect', crossfadeSeconds: 0.5,
+    effect: { pattern: 'swell', activation: 'timed', durationBeats: 4, overrideColour: false },
+    groups: groups.map((group) => ({ ...makeMoodGroup(group), intensityMin: 1, intensityMax: 1 })),
   }
 }
 
@@ -331,9 +346,19 @@ export function validateConfig(input: unknown): string[] {
   if (Array.isArray(config.moods)) {
     uniqueIds(config.moods.filter(isRecord) as Mood[], 'Mood')
     for (const rawMood of config.moods) {
-      if (!checkShape(rawMood, 'Mood', ['id', 'name', 'beatsPerChange', 'smoothness', 'crossfadeSeconds', 'groups'], ['type', 'hueVariance'])) continue
+      if (!checkShape(rawMood, 'Mood', ['id', 'name', 'beatsPerChange', 'smoothness', 'crossfadeSeconds', 'groups'], ['type', 'hueVariance', 'effect'])) continue
       const mood = rawMood as Mood
-      if ('type' in mood && mood.type !== 'atmosphere' && mood.type !== 'base') errors.push('Mood type must be atmosphere or base.')
+      if ('type' in mood && mood.type !== 'atmosphere' && mood.type !== 'base' && mood.type !== 'effect') errors.push('Mood type must be atmosphere, base or effect.')
+      if (mood.type === 'effect') {
+        if (checkShape(mood.effect, 'Effect settings', ['pattern', 'activation', 'durationBeats', 'overrideColour'])) {
+          const fx = mood.effect!
+          if (!['swell', 'accent', 'solo', 'pulse'].includes(fx.pattern)) errors.push('Effect pattern must be swell, accent, solo or pulse.')
+          if (!['timed', 'hold', 'toggle'].includes(fx.activation)) errors.push('Effect activation must be timed, hold or toggle.')
+          if (!isFiniteIn(fx.durationBeats, 0.25, 128)) errors.push('Effect duration must be 0.25-128 beats.')
+          if (typeof fx.overrideColour !== 'boolean') errors.push('Effect colour override must be true or false.')
+        }
+        if ((mood.hueVariance ?? 0) !== 0 || !Array.isArray(mood.groups) || mood.groups.length === 0) errors.push('Effects need at least one group and no hue variance.')
+      } else if ('effect' in mood) errors.push('Only effect moods may have effect settings.')
       if ('hueVariance' in mood && !isFiniteIn(mood.hueVariance, 0, maxHueVariance)) errors.push('Hue variance must be 0-15%.')
       if (mood.type === 'base' && (mood.hueVariance ?? 0) !== 0) errors.push('Base moods cannot use hue variance.')
       if (!isText(mood.name)) errors.push('Every mood needs a name.')
@@ -359,6 +384,9 @@ export function validateConfig(input: unknown): string[] {
         if (mood.type === 'base' && (group.colorMode !== 'static' || !Array.isArray(group.palette) || group.palette.length !== 1 || group.intensityMin !== group.intensityMax)) {
           errors.push('Base moods need one static colour and fixed intensity per group.')
         }
+        if (mood.type === 'effect' && (group.colorMode !== 'static' || !Array.isArray(group.palette) || group.palette.length !== 1 || group.intensityMin !== group.intensityMax)) {
+          errors.push('Effects need one static target colour and intensity per group.')
+        }
       }
     }
   }
@@ -372,7 +400,7 @@ export function validateConfig(input: unknown): string[] {
     if (typeof show.pauseMoodId !== 'string' || (show.pauseMoodId !== '' && !moodIds.has(show.pauseMoodId))) {
       errors.push('Pause must reference an existing mood or be blank.')
     }
-    if (Array.isArray(config.moods) && config.moods.some((mood) => isRecord(mood) && mood.id === show.pauseMoodId && mood.type === 'base')) errors.push('Pause must use an atmosphere mood.')
+    if (Array.isArray(config.moods) && config.moods.some((mood) => isRecord(mood) && mood.id === show.pauseMoodId && (mood.type === 'base' || mood.type === 'effect'))) errors.push('Pause must use an atmosphere mood.')
   }
   return [...new Set(errors)]
 }

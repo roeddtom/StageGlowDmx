@@ -254,6 +254,19 @@ func (c *Controller) ClearBase() {
 	c.engine.ClearBase()
 }
 
+func (c *Controller) Effect(id string, stop, hardware bool) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed || c.status.State == "fault" || c.status.CleanupPending || hardware != c.status.Enabled {
+		return errors.New("output unavailable or changed; refresh and check USB output before triggering effects")
+	}
+	if stop {
+		c.engine.StopEffect(id)
+		return nil
+	}
+	return c.engine.TriggerEffect(id)
+}
+
 func (c *Controller) Master(value float64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

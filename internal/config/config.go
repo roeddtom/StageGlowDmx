@@ -80,10 +80,19 @@ type Mood struct {
 	HueVariance      float64     `json:"hueVariance,omitempty"`
 	CrossfadeSeconds float64     `json:"crossfadeSeconds"`
 	Groups           []MoodGroup `json:"groups"`
+	Effect           *Effect     `json:"effect,omitempty"`
+}
+
+type Effect struct {
+	Pattern        string  `json:"pattern"`
+	Activation     string  `json:"activation"`
+	DurationBeats  float64 `json:"durationBeats"`
+	OverrideColour bool    `json:"overrideColour"`
 }
 
 // Missing types in schema-1 configurations retain their original atmosphere behavior.
-func (m Mood) IsBase() bool { return m.Type == "base" }
+func (m Mood) IsBase() bool   { return m.Type == "base" }
+func (m Mood) IsEffect() bool { return m.Type == "effect" }
 
 type Show struct {
 	Slots       []string `json:"slots"`
@@ -215,6 +224,15 @@ func Decode(r io.Reader) (Config, error) {
 		for _, item := range items {
 			if err := required(item, "id", "name", "beatsPerChange", "smoothness", "crossfadeSeconds", "groups"); err != nil {
 				return c, err
+			}
+			if data, exists := item["effect"]; exists {
+				var effect map[string]json.RawMessage
+				if err := json.Unmarshal(data, &effect); err != nil {
+					return c, err
+				}
+				if err := required(effect, "pattern", "activation", "durationBeats", "overrideColour"); err != nil {
+					return c, err
+				}
 			}
 			var settings []map[string]json.RawMessage
 			_ = json.Unmarshal(item["groups"], &settings)
@@ -380,7 +398,7 @@ func (c Config) Validate() error {
 			return invalid("show must reference existing moods or empty strings")
 		}
 		for _, mood := range c.Moods {
-			if mood.ID == c.Show.PauseMoodID && mood.IsBase() {
+			if mood.ID == c.Show.PauseMoodID && (mood.IsBase() || mood.IsEffect()) {
 				return invalid("show.pauseMoodId must reference an atmosphere mood")
 			}
 		}
@@ -399,8 +417,28 @@ func validateMoods(moods []Mood, groups map[string]bool) error {
 		if err := identity(m.ID, m.Name, "moods", ids); err != nil {
 			return err
 		}
-		if m.Type != "" && m.Type != "atmosphere" && m.Type != "base" {
-			return invalid("mood %q type must be atmosphere or base", m.ID)
+		if m.Type != "" && m.Type != "atmosphere" && m.Type != "base" && !m.IsEffect() {
+			return invalid("mood %q type must be atmosphere, base or effect", m.ID)
+		}
+		if m.IsEffect() {
+			if m.Effect == nil {
+				return invalid("effect mood %q requires effect settings", m.ID)
+			}
+			fx := m.Effect
+			if fx.Pattern != "swell" && fx.Pattern != "accent" && fx.Pattern != "solo" && fx.Pattern != "pulse" {
+				return invalid("effect pattern must be swell, accent, solo or pulse")
+			}
+			if fx.Activation != "timed" && fx.Activation != "hold" && fx.Activation != "toggle" {
+				return invalid("effect activation must be timed, hold or toggle")
+			}
+			if !finiteRange(fx.DurationBeats, 0.25, 128) {
+				return invalid("effect duration must be 0.25-128 beats")
+			}
+			if len(m.Groups) == 0 || m.HueVariance != 0 {
+				return invalid("effects need at least one group and no hue variance")
+			}
+		} else if m.Effect != nil {
+			return invalid("only effect moods may have effect settings")
 		}
 		if !finiteRange(m.BeatsPerChange, 0.25, 128) || !finiteRange(m.Smoothness, 0.05, 1) ||
 			!finiteRange(m.CrossfadeSeconds, 0, 30) {
@@ -438,6 +476,9 @@ func validateMoods(moods []Mood, groups map[string]bool) error {
 			if m.IsBase() && (g.ColorMode != "static" || len(g.Palette) != 1 || g.IntensityMin != g.IntensityMax) {
 				return invalid("base mood %q requires one static colour and fixed intensity per group", m.ID)
 			}
+			if m.IsEffect() && (g.ColorMode != "static" || len(g.Palette) != 1 || g.IntensityMin != g.IntensityMax) {
+				return invalid("effects require one static target colour and intensity per group")
+			}
 		}
 	}
 	return nil
@@ -472,6 +513,10 @@ func clone(c Config) Config {
 	}
 	c.Moods = append([]Mood{}, c.Moods...)
 	for i := range c.Moods {
+		if c.Moods[i].Effect != nil {
+			effect := *c.Moods[i].Effect
+			c.Moods[i].Effect = &effect
+		}
 		c.Moods[i].Groups = append([]MoodGroup{}, c.Moods[i].Groups...)
 		for j := range c.Moods[i].Groups {
 			c.Moods[i].Groups[j].Palette = append([]string{}, c.Moods[i].Groups[j].Palette...)

@@ -46,6 +46,7 @@ type State struct {
 	EngineStatus     string         `json:"engineStatus"`
 	ActiveMoodID     string         `json:"activeMoodId"`
 	ActiveBaseMoodID string         `json:"activeBaseMoodId"`
+	ActiveEffectID   string         `json:"activeEffectId"`
 	BPM              float64        `json:"bpm"`
 	Master           float64        `json:"master"`
 	Fixtures         []FixtureState `json:"fixtures"`
@@ -65,6 +66,7 @@ type Engine struct {
 	master     float64
 	atmosphere moodLayer
 	base       moodLayer
+	effect     effectLayer
 	restoreAt  time.Time
 	restoreFor float64
 }
@@ -90,18 +92,21 @@ func (e *Engine) Configure(c config.Config) {
 	beforeBase := e.layerLights(e.base, now)
 	patchChanged := e.cfg.ActiveLoadoutID != c.ActiveLoadoutID ||
 		!reflect.DeepEqual(e.cfg.Loadouts, c.Loadouts) || !reflect.DeepEqual(e.cfg.Profiles, c.Profiles)
-	oldMood, oldBase := e.mood(e.atmosphere.active), e.mood(e.base.active)
+	oldMood, oldBase, oldEffect := e.mood(e.atmosphere.active), e.mood(e.base.active), e.mood(e.effect.active)
 	if c.BPM != e.cfg.BPM {
 		e.anchor, e.epoch = e.beats, now
 	}
 	e.cfg = c.Copy()
 	nextMood, nextBase := e.mood(e.atmosphere.active), e.mood(e.base.active)
+	if patchChanged || !reflect.DeepEqual(oldEffect, e.mood(e.effect.active)) {
+		e.effect = effectLayer{}
+	}
 	if patchChanged {
 		e.blackout = true
 		e.atmosphere.fadeFrom, e.base.fadeFrom = nil, nil
 		e.atmosphere.fadeFor, e.base.fadeFor = 0, 0
 	}
-	if nextMood == nil || nextMood.IsBase() {
+	if nextMood == nil || nextMood.IsBase() || nextMood.IsEffect() {
 		if e.atmosphere.active != "" {
 			e.blackout = true
 		}
@@ -133,6 +138,12 @@ func (e *Engine) Select(id string) error {
 	}
 	if selected == nil {
 		return fmt.Errorf("select an existing saved mood")
+	}
+	if selected.IsEffect() {
+		return fmt.Errorf("use the effect trigger for effect moods")
+	}
+	if id == e.cfg.Show.PauseMoodID {
+		e.effect = effectLayer{}
 	}
 	now := e.advance()
 	layer := &e.atmosphere
@@ -177,6 +188,9 @@ func (e *Engine) Blackout(enabled bool) error {
 		}
 	}
 	e.blackout = enabled
+	if enabled {
+		e.effect = effectLayer{}
+	}
 	return nil
 }
 
@@ -197,7 +211,8 @@ func (e *Engine) State() State {
 	values := e.lights(now)
 	state := State{
 		Blackout: e.blackout, EngineStatus: "simulation", ActiveMoodID: e.atmosphere.active, ActiveBaseMoodID: e.base.active,
-		BPM: e.cfg.BPM, Master: e.master, Fixtures: []FixtureState{},
+		ActiveEffectID: e.effect.active,
+		BPM:            e.cfg.BPM, Master: e.master, Fixtures: []FixtureState{},
 	}
 	profiles := make(map[string]config.Profile, len(e.cfg.Profiles))
 	for _, profile := range e.cfg.Profiles {
@@ -269,6 +284,7 @@ func (e *Engine) lights(now time.Time) map[string]light {
 		value.UV = (value.UV + fallback.UV*(1-value.coverage)) * restore
 		base[id] = value
 	}
+	e.applyEffect(base, now)
 	return base
 }
 
