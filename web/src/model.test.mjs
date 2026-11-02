@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { emptyConfig, makeTemplate, templates, makeMood, removeMood, tapBPM, validateConfig } from './model.ts'
+import { emptyConfig, makeTemplate, templates, makeMood, randomBrightColor, removeMood, tapBPM, validateConfig } from './model.ts'
 
 function patchedRig() {
   const config = emptyConfig()
@@ -56,6 +56,34 @@ describe('configuration validation', () => {
     assert.deepEqual(validateConfig(config), [])
   })
 
+  it('defaults new moods to 80-100% and validates optional hue variance', () => {
+    const config = patchedRig()
+    const mood = makeMood(config.groups)
+    assert.equal(mood.hueVariance, 0)
+    assert.deepEqual([mood.groups[0].intensityMin, mood.groups[0].intensityMax], [0.8, 1])
+    config.moods = [mood]
+    for (const hueVariance of [0, 0.15]) {
+      mood.hueVariance = hueVariance
+      assert.deepEqual(validateConfig(config), [])
+    }
+    delete mood.hueVariance
+    assert.deepEqual(validateConfig(config), [])
+    for (const hueVariance of [-0.01, 0.16, null, '0.1']) {
+      mood.hueVariance = hueVariance
+      assert.ok(validateConfig(config).length > 0)
+    }
+  })
+
+  it('suggests vivid colours at full saturation and brightness', () => {
+    assert.equal(randomBrightColor(() => 0), '#ff0000')
+    assert.equal(randomBrightColor(() => 0.5), '#00ffff')
+    for (let i = 0; i < 50; i++) {
+      const rgb = randomBrightColor().slice(1).match(/../g).map((part) => parseInt(part, 16))
+      assert.equal(Math.max(...rgb), 255)
+      assert.equal(Math.min(...rgb), 0)
+    }
+  })
+
   it('accepts legacy atmospheres and validates static base moods and Pause type', () => {
     const config = patchedRig()
     const mood = makeMood(config.groups)
@@ -63,11 +91,13 @@ describe('configuration validation', () => {
     config.moods = [mood]
     assert.deepEqual(validateConfig(config), [])
     mood.type = 'base'
+    mood.groups[0].intensityMax = mood.groups[0].intensityMin
     config.show.slots[0] = mood.id
     assert.deepEqual(validateConfig(config), [])
     for (const edit of [
       (c) => { c.moods[0].type = 'unknown' },
       (c) => { c.moods[0].type = null },
+      (c) => { c.moods[0].hueVariance = 0.05 },
       (c) => { c.moods[0].groups[0].colorMode = 'palette' },
       (c) => { c.moods[0].groups[0].palette.push('#ffffff') },
       (c) => { c.moods[0].groups[0].intensityMax = 1 },
@@ -153,7 +183,7 @@ describe('configuration validation', () => {
       for (const edit of [
         (mood) => { mood.groups[0].palette = [] },
         (mood) => { mood.groups[0].palette = ['red'] },
-        (mood) => { mood.groups[0].intensityMin = 0.9 },
+        (mood) => { mood.groups[0].intensityMin = 1; mood.groups[0].intensityMax = 0.9 },
         (mood) => { mood.groups[0].colorMode = 'strobe' },
         (mood) => { mood.groups[0].groupId = 'deleted' },
         (mood) => { mood.groups[0].uv = 1.1 },

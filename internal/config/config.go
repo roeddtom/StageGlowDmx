@@ -68,12 +68,16 @@ type MoodGroup struct {
 	UV           float64  `json:"uv"`
 }
 
+// MaxHueVariance is the largest random hue shift, as a fraction of the colour wheel in each direction.
+const MaxHueVariance = 0.15
+
 type Mood struct {
 	ID               string      `json:"id"`
 	Name             string      `json:"name"`
 	Type             string      `json:"type,omitempty"`
 	BeatsPerChange   float64     `json:"beatsPerChange"`
 	Smoothness       float64     `json:"smoothness"`
+	HueVariance      float64     `json:"hueVariance,omitempty"`
 	CrossfadeSeconds float64     `json:"crossfadeSeconds"`
 	Groups           []MoodGroup `json:"groups"`
 }
@@ -401,6 +405,12 @@ func validateMoods(moods []Mood, groups map[string]bool) error {
 		if !finiteRange(m.BeatsPerChange, 0.25, 128) || !finiteRange(m.Smoothness, 0.05, 1) ||
 			!finiteRange(m.CrossfadeSeconds, 0, 30) {
 			return invalid("mood %q requires beatsPerChange 0.25-128, smoothness 0.05-1 and crossfadeSeconds 0-30", m.ID)
+		}
+		if !finiteRange(m.HueVariance, 0, MaxHueVariance) {
+			return invalid("mood %q hueVariance must be 0-%.2f", m.ID, MaxHueVariance)
+		}
+		if m.IsBase() && m.HueVariance != 0 {
+			return invalid("base mood %q must not use hue variance", m.ID)
 		}
 		if m.Groups == nil {
 			return invalid("mood %q groups must be an array", m.ID)

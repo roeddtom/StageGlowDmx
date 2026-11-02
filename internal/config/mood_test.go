@@ -38,6 +38,8 @@ func TestMoodValidation(t *testing.T) {
 		"snapping":           func(c *Config) { c.Moods[0].Smoothness = 0 },
 		"NaN":                func(c *Config) { c.Moods[0].Smoothness = math.NaN() },
 		"fade":               func(c *Config) { c.Moods[0].CrossfadeSeconds = math.Inf(1) },
+		"hue variance":       func(c *Config) { c.Moods[0].HueVariance = 0.16 },
+		"negative hue":       func(c *Config) { c.Moods[0].HueVariance = -0.01 },
 		"null groups":        func(c *Config) { c.Moods[0].Groups = nil },
 		"null moods":         func(c *Config) { c.Moods = nil },
 	} {

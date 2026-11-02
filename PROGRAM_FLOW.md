@@ -408,6 +408,11 @@ At `t = 0`, this returns `a`; at `t = 1`, it returns `b`.
 The `random` helper hashes the seed, mood/fixture identity, interval number, and
 stream number. It produces repeatable targets without consuming a sequential
 random-number stream on every sample. Colour and intensity use separate streams.
+A third stream supplies the hue shift for palette-drift groups when the mood's
+`hueVariance` is above zero. The shift is interpolated between interval targets
+like colour and intensity, ranges from `-hueVariance` to `+hueVariance` turns of
+the colour wheel (maximum 0.15, about 54 degrees), and keeps HSV saturation and
+brightness. Static groups and Base moods never shift hue.
 Extra browser polls do not change the targets.
 
 ### Combining the layers

@@ -34,6 +34,7 @@ export type Mood = {
   type?: 'atmosphere' | 'base'
   beatsPerChange: number
   smoothness: number
+  hueVariance?: number
   crossfadeSeconds: number
   groups: MoodGroup[]
 }
@@ -92,19 +93,34 @@ export const emptyConfig = (): Config => ({
   show: emptyShow(),
 })
 
+export const maxHueVariance = 0.15
+
+// Full saturation and brightness so native colour pickers open on a vivid suggestion, not black.
+export function randomBrightColor(random = Math.random): string {
+  const hue = random() * 6
+  const x = 1 - Math.abs((hue % 2) - 1)
+  const rgb = [[1, x, 0], [x, 1, 0], [0, 1, x], [0, x, 1], [x, 0, 1], [1, 0, x]][Math.min(5, Math.floor(hue))]
+  return `#${rgb.map((value) => Math.round(value * 255).toString(16).padStart(2, '0')).join('')}`
+}
+
 export function makeMoodGroup(group: Group, evolving = false): MoodGroup {
   return {
     groupId: group.id, colorMode: evolving ? 'palette' : 'static',
     palette: evolving ? ['#1644ff', '#a020f0', '#1634a0'] : ['#ffbb66'],
-    intensityMin: evolving ? 0.3 : 0.6, intensityMax: 0.6, uv: 0,
+    intensityMin: 0.8, intensityMax: 1, uv: 0,
   }
 }
 
 export function makeMood(groups: Group[], starter = false): Mood {
   return {
     id: makeId(), name: starter ? 'Warm stage' : 'New mood', type: 'atmosphere',
-    beatsPerChange: 8, smoothness: 1, crossfadeSeconds: 3,
-    groups: groups.map((group) => makeMoodGroup(group, starter && !/front/i.test(group.name))),
+    beatsPerChange: 8, smoothness: 1, hueVariance: 0, crossfadeSeconds: 3,
+    groups: groups.map((group) => {
+      const front = /front/i.test(group.name)
+      const settings = makeMoodGroup(group, starter && !front)
+      // The starter keeps front light steady so faces stay evenly lit.
+      return starter && front ? { ...settings, intensityMax: settings.intensityMin } : settings
+    }),
   }
 }
 
@@ -314,9 +330,11 @@ export function validateConfig(input: unknown): string[] {
   if (Array.isArray(config.moods)) {
     uniqueIds(config.moods.filter(isRecord) as Mood[], 'Mood')
     for (const rawMood of config.moods) {
-      if (!checkShape(rawMood, 'Mood', ['id', 'name', 'beatsPerChange', 'smoothness', 'crossfadeSeconds', 'groups'], ['type'])) continue
+      if (!checkShape(rawMood, 'Mood', ['id', 'name', 'beatsPerChange', 'smoothness', 'crossfadeSeconds', 'groups'], ['type', 'hueVariance'])) continue
       const mood = rawMood as Mood
       if ('type' in mood && mood.type !== 'atmosphere' && mood.type !== 'base') errors.push('Mood type must be atmosphere or base.')
+      if ('hueVariance' in mood && !isFiniteIn(mood.hueVariance, 0, maxHueVariance)) errors.push('Hue variance must be 0-15%.')
+      if (mood.type === 'base' && (mood.hueVariance ?? 0) !== 0) errors.push('Base moods cannot use hue variance.')
       if (!isText(mood.name)) errors.push('Every mood needs a name.')
       if (!isFiniteIn(mood.beatsPerChange, 0.25, 128)) errors.push('Beats per change must be 0.25-128.')
       if (!isFiniteIn(mood.smoothness, 0.05, 1)) errors.push('Smoothness must be 0.05-1.')

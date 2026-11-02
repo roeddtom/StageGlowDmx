@@ -45,20 +45,26 @@ Frontend tests use Node's built-in test runner.
 
 1. Define profiles and groups, patch fixtures into a loadout, and select that
    loadout as active on the Fixtures page.
-2. Open Moods and create a starter or a new mood. The starter keeps groups named
-   Front steady and gives other groups a blue/purple palette. Edit colours,
-   intensity bounds, UV, beats per change, smoothness, and crossfade duration.
+2. Open Moods and create a starter or a new mood. New moods start at 80-100%
+   intensity. The starter keeps groups named Front steady at 80% and gives
+   other groups a blue/purple palette. Edit colours, intensity bounds, UV, beats
+   per change, smoothness, hue variance, and crossfade duration.
    Equal intensity bounds hold brightness steady; excluded groups use the
    selected Base, or stay dark without one.
-   Intensity, smoothness, and crossfade have sliders with precise numeric inputs.
-   Intensity is shown as a percentage; the **?** buttons explain each control.
+   Intensity, smoothness, hue variance, and crossfade have sliders with precise
+   numeric inputs. Intensity is shown as a percentage; the **?** buttons explain
+   each control. **Add colour** suggests a vivid colour with a random hue, so
+   phone colour pickers do not open on black.
 3. Apply the mood and wait for Saved. Select it in the mood list, then explicitly
    start the simulation. Inspect fixture colours and generated DMX values.
 
 Use global BPM or tap tempo to control the flow. For example, 8 beats at 120 BPM
 means a new target every 4 seconds. Smoothness 1 glides for the whole interval;
 lower values glide sooner and then hold. Palette targets and intensity targets
-are chosen independently for each fixture. White/amber extraction is approximate
+are chosen independently for each fixture. Hue variance (0-15%, default 0)
+randomly shifts each new palette-drift colour target by up to that share of the
+colour wheel in either direction, keeping saturation and brightness. It does not
+affect static groups or Base moods. White/amber extraction is approximate
 and controlled by the fixture profile; UV follows intensity and master brightness.
 
 On the Moods editor page, simulation blackout is immediate and stays latched

@@ -308,6 +308,10 @@ func (e *Engine) layerLights(layer moodLayer, now time.Time) map[string]light {
 					position = lerp(e.random(key, segment, 0), e.random(key, segment+1, 0), blend)
 				}
 				color := palette(group.Palette, position)
+				if group.ColorMode == "palette" && mood.HueVariance > 0 {
+					shift := lerp(e.random(key, segment, 2), e.random(key, segment+1, 2), blend)
+					color = rotateHue(color, (2*shift-1)*mood.HueVariance)
+				}
 				intensity := lerp(group.IntensityMin, group.IntensityMax,
 					lerp(e.random(key, segment, 1), e.random(key, segment+1, 1), blend))
 				value.Intensity, value.UV = intensity, group.UV*intensity
@@ -363,6 +367,49 @@ func palette(colors []string, position float64) [3]float64 {
 		first[i] = lerp(first[i], second[i], location-float64(index))
 	}
 	return first
+}
+
+// rotateHue shifts hue by turns of the colour wheel, keeping HSV saturation and value.
+func rotateHue(color [3]float64, turns float64) [3]float64 {
+	max := math.Max(color[0], math.Max(color[1], color[2]))
+	min := math.Min(color[0], math.Min(color[1], color[2]))
+	chroma := max - min
+	if chroma == 0 || turns == 0 {
+		return color
+	}
+	var hue float64
+	switch max {
+	case color[0]:
+		hue = math.Mod((color[1]-color[2])/chroma, 6)
+	case color[1]:
+		hue = (color[2]-color[0])/chroma + 2
+	default:
+		hue = (color[0]-color[1])/chroma + 4
+	}
+	hue = math.Mod(hue+turns*6, 6)
+	if hue < 0 {
+		hue += 6
+	}
+	x := chroma * (1 - math.Abs(math.Mod(hue, 2)-1))
+	var rgb [3]float64
+	switch int(hue) {
+	case 0:
+		rgb = [3]float64{chroma, x, 0}
+	case 1:
+		rgb = [3]float64{x, chroma, 0}
+	case 2:
+		rgb = [3]float64{0, chroma, x}
+	case 3:
+		rgb = [3]float64{0, x, chroma}
+	case 4:
+		rgb = [3]float64{x, 0, chroma}
+	default:
+		rgb = [3]float64{chroma, 0, x}
+	}
+	for i := range rgb {
+		rgb[i] += min
+	}
+	return rgb
 }
 
 func parseColor(color string) [3]float64 {

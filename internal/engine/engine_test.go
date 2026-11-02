@@ -48,6 +48,46 @@ func testEngine(t *testing.T, c config.Config) (*Engine, *time.Time) {
 	return e, &now
 }
 
+func TestHueVarianceShiftsOnlyPaletteGroupsWithinBounds(t *testing.T) {
+	c := testRig()
+	c.Moods[0].HueVariance = 0.1
+	c.Moods[0].Groups[1].Palette = []string{"#ff0000"}
+	c.Moods[0].Groups[1].IntensityMin, c.Moods[0].Groups[1].IntensityMax = 1, 1
+	e, now := testEngine(t, c)
+	front := e.State().Fixtures[0]
+	sawGreen, sawBlue := false, false
+	for i := 0; i < 400; i++ {
+		*now = now.Add(100 * time.Millisecond)
+		state := e.State()
+		if !reflect.DeepEqual(state.Fixtures[0], front) {
+			t.Fatal("hue variance changed a static group")
+		}
+		for _, fixture := range state.Fixtures[1:] {
+			r, g, b := fixture.Channels[0], fixture.Channels[1], fixture.Channels[2]
+			if r != 255 || (g != 0 && b != 0) || g > 154 || b > 154 {
+				t.Fatal("hue escaped +/-10% of the wheel or lost saturation", fixture.Channels)
+			}
+			sawGreen, sawBlue = sawGreen || g > 0, sawBlue || b > 0
+		}
+	}
+	if !sawGreen || !sawBlue {
+		t.Fatal("hue variance must shift both directions")
+	}
+}
+
+func TestRotateHueKeepsSaturationAndValue(t *testing.T) {
+	got := rotateHue([3]float64{1, 0.2, 0.2}, 1.0/3)
+	want := [3]float64{0.2, 1, 0.2}
+	for i := range got {
+		if math.Abs(got[i]-want[i]) > 1e-9 {
+			t.Fatal(got)
+		}
+	}
+	if grey := rotateHue([3]float64{0.5, 0.5, 0.5}, 0.1); grey != [3]float64{0.5, 0.5, 0.5} {
+		t.Fatal("grey must not change", grey)
+	}
+}
+
 func TestStaticFrontAndIndependentBoundedDrift(t *testing.T) {
 	e, now := testEngine(t, testRig())
 	initial := e.State()

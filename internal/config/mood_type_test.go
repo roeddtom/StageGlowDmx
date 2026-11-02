@@ -28,6 +28,7 @@ func TestMoodTypesAndStaticBaseValidation(t *testing.T) {
 		func(c *Config) { c.Moods[0].Groups[0].ColorMode = "palette" },
 		func(c *Config) { c.Moods[0].Groups[0].Palette = []string{"#ffffff", "#000000"} },
 		func(c *Config) { c.Moods[0].Groups[0].IntensityMax = 1 },
+		func(c *Config) { c.Moods[0].HueVariance = 0.05 },
 		func(c *Config) { c.Show.PauseMoodID = "band" },
 	} {
 		next := c.Copy()

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { makeId, makeMood, makeMoodGroup, removeMood, tapBPM, validateConfig, type Config, type Mood, type MoodGroup, type RuntimeState } from '../model'
+import { makeId, makeMood, makeMoodGroup, maxHueVariance, randomBrightColor, removeMood, tapBPM, validateConfig, type Config, type Mood, type MoodGroup, type RuntimeState } from '../model'
 import { MoodSlider } from './MoodSlider'
 
 export type SimulationCommand =
@@ -105,10 +105,11 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
           const type = event.target.value as 'base' | 'atmosphere'
           if (type === 'base' && draft.groups.some((group) => group.colorMode !== 'static' || group.palette.length !== 1 || group.intensityMin !== group.intensityMax) &&
             !window.confirm('Convert to static Base lighting? Each group will keep its first colour and minimum intensity as a fixed level.')) return
-          setDraft({ ...draft, type, groups: type === 'base' ? draft.groups.map((group) => ({ ...group, colorMode: 'static', palette: group.palette.slice(0, 1), intensityMax: group.intensityMin })) : draft.groups })
+          setDraft({ ...draft, type, hueVariance: type === 'base' ? 0 : draft.hueVariance, groups: type === 'base' ? draft.groups.map((group) => ({ ...group, colorMode: 'static', palette: group.palette.slice(0, 1), intensityMax: group.intensityMin })) : draft.groups })
         }}><option value="atmosphere">Atmosphere</option><option value="base">Base (static fallback)</option></select></label>
         {!baseDraft && <label className="field">Change every (beats)<input type="number" min="0.25" max="128" step="0.25" value={draft.beatsPerChange} onChange={(event) => setDraft({ ...draft, beatsPerChange: Number(event.target.value) })} /></label>}
         {!baseDraft && <MoodSlider label="Smoothness" value={draft.smoothness} min={0.05} max={1} step={0.05} endpoints={['Glide then hold', 'Continuous glide']} help="Controls how much of each change interval is spent gliding to the next colour and intensity target. At 1, the glide lasts the whole interval. Lower values reach the target sooner, then hold. This does not change the interval's tempo." onChange={(smoothness) => setDraft({ ...draft, smoothness })} />}
+        {!baseDraft && <MoodSlider label="Hue variance" value={draft.hueVariance ?? 0} min={0} max={maxHueVariance * 100} step={1} scale={100} unit="%" endpoints={['Exact colours', 'Wider shades']} help="Adds variety to groups using palette drift. Each new colour target shifts its hue randomly by up to this share of the colour wheel in either direction (15% is about 54 degrees). Saturation and brightness stay the same. Static groups are unaffected. 0% uses the palette colours exactly." onChange={(hueVariance) => setDraft({ ...draft, hueVariance: Math.min(maxHueVariance, Math.max(0, hueVariance)) })} />}
         <MoodSlider label="Crossfade" value={draft.crossfadeSeconds} min={0} max={30} step={0.5} unit="s" help="How many seconds it takes to transition into this mood, including when restoring it from blackout. Zero switches immediately. Blackout itself is always immediate." onChange={(crossfadeSeconds) => setDraft({ ...draft, crossfadeSeconds })} />
       </div>
       <p className="subtle">{baseDraft ? 'Base lighting is static. Include only the groups you want as fallback; an Atmosphere explicitly including a group overrides it, even at 0% intensity.' : 'Smoothness 1 glides for the whole interval. Equal intensity bounds keep brightness fixed. Exclude groups such as Front to preserve their Base lighting.'} UV defaults to off.</p>
@@ -133,7 +134,7 @@ export function Moods({ config, runtime, ready, busy, onUpdate, onCommand, onNot
                 <label className="field">Colour {index + 1} - {group.name}<input type="color" value={color} onChange={(event) => editGroup(group.id, { palette: settings.palette.map((item, i) => i === index ? event.target.value : item) })} /></label>
                 <button className="text-button danger-text" disabled={settings.palette.length <= 1} aria-label={`Remove colour ${index + 1} from ${group.name}`} onClick={() => editGroup(group.id, { palette: settings.palette.filter((_, i) => i !== index) })}>Remove</button>
               </div>)}
-              {!baseDraft && <button className="button small" disabled={settings.palette.length >= 32} onClick={() => editGroup(group.id, { palette: [...settings.palette, '#1644ff'] })} aria-label={`Add colour to ${group.name}`}>Add colour</button>}
+              {!baseDraft && <button className="button small" disabled={settings.palette.length >= 32} onClick={() => editGroup(group.id, { palette: [...settings.palette, randomBrightColor()] })} aria-label={`Add colour to ${group.name}`}>Add colour</button>}
             </div>
           </>}
         </fieldset>
